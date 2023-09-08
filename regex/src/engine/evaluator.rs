@@ -126,12 +126,6 @@ fn eval_width(inst: &[Instruction], line: &[char]) -> Result<bool, EvalError> {
                 continue;
             }
         }
-
-        // TODO: これは何のため? 無意味に見える。
-        // if !ctx.is_empty() {
-        //     ctx.push_back((pc, sp));
-        //     pop_ctx(&mut pc, &mut sp, &mut ctx)?;
-        // }
     }
 }
 
