@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 pub mod codegen;
+pub mod evaluator;
 pub mod parser;
 
 #[derive(Debug)]
