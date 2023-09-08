@@ -29,7 +29,21 @@ struct Generator {
     insts: Vec<Instruction>,
 }
 
+pub fn get_code(ast: &AST) -> Result<Vec<Instruction>, CodeGenError> {
+    let mut code_gen = Generator::default();
+    code_gen.gen_code(ast)?;
+    Ok(code_gen.insts)
+}
+
 impl Generator {
+    /// コード生成を行う関数。
+    fn gen_code(&mut self, ast: &AST) -> Result<(), CodeGenError> {
+        self.gen_expr(ast)?;
+        self.inc_pc()?;
+        self.insts.push(Instruction::Match);
+        Ok(())
+    }
+
     /// プログラムカウンタをインクリメント。
     fn inc_pc(&mut self) -> Result<(), CodeGenError> {
         safe_add(&mut self.pc, &1, || CodeGenError::PCoverFlow)
