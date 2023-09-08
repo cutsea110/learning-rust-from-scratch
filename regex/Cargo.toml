@@ -8,4 +8,8 @@ edition = "2021"
 [dependencies]
 
 [dev-dependencies]
-criterion = "0.3.5"
+criterion = "0.3.6"
+
+[[bench]]
+name = "benchmark"
+harness = false
