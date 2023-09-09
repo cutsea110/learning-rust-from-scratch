@@ -24,14 +24,12 @@ fn match_file(expr: &str, file: &str) -> Result<(), DynError> {
     let f = File::open(file)?;
     let reader = BufReader::new(f);
 
-    engine::print(expr)?;
-    println!();
-
-    for line in reader.lines() {
+    for (i, line) in reader.lines().enumerate() {
         let line = line?;
-        for (i, _) in line.char_indices() {
-            if engine::do_matching(expr, &line[i..], true)? {
-                println!("{line}");
+        let i = i + 1;
+        for (j, _) in line.char_indices() {
+            if engine::do_matching(expr, &line[j..], true)? {
+                println!("{file}:{i}:{line}");
                 break;
             }
         }
@@ -46,6 +44,9 @@ fn main() -> Result<(), DynError> {
         println!("Usage: {} <regex> <file>", args[0]);
         return Err("invalid arguments".into());
     } else {
+        engine::print(&args[1])?;
+        println!();
+
         match_file(&args[1], &args[2])?;
     }
 
