@@ -31,6 +31,19 @@ where
 pub fn satisfy<F: Fn(String) -> bool>(pred: F) -> Sat<F> {
     Sat { pred }
 }
+#[cfg(test)]
+mod sat {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = satisfy(|s| s == "foo");
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![("foo".to_string(), vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Lit {
@@ -50,6 +63,19 @@ impl Parser for Lit {
 pub fn literal(s: &'static str) -> Lit {
     Lit { s }
 }
+#[cfg(test)]
+mod lit {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = literal("foo");
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![("foo".to_string(), vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Empty<T: Clone>(T);
@@ -62,6 +88,18 @@ impl<T: Clone> Parser for Empty<T> {
 }
 pub fn empty<T: Clone>(x: T) -> Empty<T> {
     Empty(x)
+}
+#[cfg(test)]
+mod empty {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = empty(42);
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![(42, vec![(0, "foo".to_string())].into())]
+        );
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +123,19 @@ impl<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> Parser for Bind<T, P, F
 pub fn bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser>(px: P, f: F) -> Bind<T, P, F, Q> {
     Bind { px, f }
 }
+#[cfg(test)]
+mod bind {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = bind(literal("foo"), |s| empty(s.len()));
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![(3, vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Apply<T, U, P: Parser<Output = T>> {
@@ -104,6 +155,19 @@ impl<T: Clone, U, P: Parser<Output = T>> Parser for Apply<T, U, P> {
 }
 pub fn apply<T, U, P: Parser<Output = T>>(px: P, f: fn(T) -> U) -> Apply<T, U, P> {
     Apply { px, f }
+}
+#[cfg(test)]
+mod apply {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = apply(literal("foo"), |s| s.len());
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![(3, vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -134,6 +198,24 @@ pub fn apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>>(
 ) -> Apply2<T, U, V, P, Q> {
     Apply2 { px, qx, f }
 }
+#[cfg(test)]
+mod apply2 {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = apply2(literal("foo"), literal("bar"), |s, t| (s.len(), t.len()));
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+            vec![((3, 3), vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "foobar".to_string())].into()), vec![]);
+        assert_eq!(p.parse(vec![(0, "foo".to_string())].into()), vec![]);
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "buz".to_string())].into()),
+            vec![]
+        );
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Alt<T, P: Parser<Output = T>, Q: Parser<Output = T>> {
@@ -156,6 +238,42 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for Alt<T, P, Q> {
 }
 pub fn alt<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> Alt<T, P, Q> {
     Alt { px, qx }
+}
+#[cfg(test)]
+mod alt {
+    #[test]
+    fn basic() {
+        use super::*;
+        let p = alt(literal("foo"), literal("bar"));
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+            vec![("foo".to_string(), vec![(1, "bar".to_string())].into())]
+        );
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![("foo".to_string(), vec![].into())]
+        );
+        assert_eq!(
+            p.parse(vec![(0, "bar".to_string())].into()),
+            vec![("bar".to_string(), vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "baz".to_string())].into()), vec![]);
+    }
+    #[test]
+    fn both() {
+        use super::*;
+        let p = alt(
+            literal("foo"),
+            apply2(literal("foo"), literal("bar"), |s, t| s + &t),
+        );
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+            vec![
+                ("foo".to_string(), vec![(1, "bar".to_string())].into()),
+                ("foobar".to_string(), vec![].into())
+            ]
+        );
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -181,6 +299,39 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for AltL<T, P, Q> {
 }
 pub fn altl<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> AltL<T, P, Q> {
     AltL { px, qx }
+}
+#[cfg(test)]
+mod altl {
+    #[test]
+    fn basic() {
+        use super::*;
+        let p = altl(literal("foo"), literal("bar"));
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+            vec![("foo".to_string(), vec![(1, "bar".to_string())].into())]
+        );
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![("foo".to_string(), vec![].into())]
+        );
+        assert_eq!(
+            p.parse(vec![(0, "bar".to_string())].into()),
+            vec![("bar".to_string(), vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "baz".to_string())].into()), vec![]);
+    }
+    #[test]
+    fn both() {
+        use super::*;
+        let p = altl(
+            literal("foo"),
+            apply2(literal("foo"), literal("bar"), |s, t| s + &t),
+        );
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+            vec![("foo".to_string(), vec![(1, "bar".to_string())].into())]
+        );
+    }
 }
 
 #[derive(Debug, Clone)]
