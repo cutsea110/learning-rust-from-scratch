@@ -9,6 +9,7 @@ trait Parser {
     fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)>;
 }
 
+#[derive(Debug, Clone)]
 struct Sat<F: Fn(String) -> bool> {
     pred: F,
 }
@@ -28,6 +29,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 struct Lit {
     s: &'static str,
 }
@@ -43,6 +45,7 @@ impl Parser for Lit {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Empty<T: Clone>(T);
 impl<T: Clone> Parser for Empty<T> {
     type Output = T;
@@ -52,6 +55,7 @@ impl<T: Clone> Parser for Empty<T> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> {
     px: P,
     f: F,
@@ -70,6 +74,7 @@ impl<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> Parser for Bind<T, P, F
     }
 }
 
+#[derive(Debug, Clone)]
 struct Apply<T, U, P: Parser<Output = T>> {
     px: P,
     f: fn(T) -> U,
@@ -86,6 +91,7 @@ impl<T: Clone, U, P: Parser<Output = T>> Parser for Apply<T, U, P> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> {
     px: P,
     qx: Q,
@@ -107,6 +113,7 @@ impl<T: Clone, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> Parser
     }
 }
 
+#[derive(Debug, Clone)]
 struct Alt<T, P: Parser<Output = T>, Q: Parser<Output = T>> {
     px: P,
     qx: Q,
@@ -126,6 +133,7 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for Alt<T, P, Q> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct AltL<T, P: Parser<Output = T>, Q: Parser<Output = T>> {
     px: P,
     qx: Q,
@@ -147,6 +155,7 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for AltL<T, P, Q> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> {
     px: P,
     pf: Q,
@@ -167,6 +176,7 @@ impl<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> Parser
     }
 }
 
+#[derive(Debug, Clone)]
 struct OneOrMore<T: Clone, P: Parser<Output = T>> {
     p: P,
 }
@@ -186,6 +196,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for OneOrMore<T, P> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct ZeroOrMore<T: Clone, P: Parser<Output = T>> {
     p: P,
 }
@@ -201,6 +212,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for ZeroOrMore<T, P> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Munch1<T: Clone, P: Parser<Output = T>> {
     px: P,
 }
@@ -222,6 +234,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch1<T, P> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Munch<T: Clone, P: Parser<Output = T>> {
     px: P,
 }
@@ -239,6 +252,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch<T, P> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct With<T, P: Parser<Output = T>, Q: Parser> {
     p: P,
     with: Q,
@@ -258,6 +272,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for With
     }
 }
 
+#[derive(Debug, Clone)]
 struct Skip<T, Q: Parser, P: Parser<Output = T>> {
     skip: Q,
     p: P,
@@ -269,6 +284,76 @@ impl<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone> Parser for Skip
         Bind {
             px: self.skip.clone(),
             f: |_| self.p.clone(),
+        }
+        .parse(tokens)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OneOrMoreWithSep<T, P: Parser<Output = T>, Q: Parser> {
+    p: P,
+    sep: Q,
+}
+impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser
+    for OneOrMoreWithSep<T, P, Q>
+{
+    type Output = Vec<T>;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        Apply2 {
+            px: self.p.clone(),
+            qx: ZeroOrMore {
+                p: Skip {
+                    skip: self.sep.clone(),
+                    p: self.p.clone(),
+                },
+            },
+            f: |x, mut xs| {
+                xs.insert(0, x.clone());
+                xs
+            },
+        }
+        .parse(tokens)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Munch1WithSep<T, P: Parser<Output = T>, Q: Parser> {
+    p: P,
+    sep: Q,
+}
+impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for Munch1WithSep<T, P, Q> {
+    type Output = Vec<T>;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        Apply2 {
+            px: self.p.clone(),
+            qx: Munch {
+                px: Skip {
+                    skip: self.sep.clone(),
+                    p: self.p.clone(),
+                },
+            },
+            f: |x, mut xs| {
+                xs.insert(0, x.clone());
+                xs
+            },
+        }
+        .parse(tokens)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Int32;
+impl Parser for Int32 {
+    type Output = i32;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        Apply {
+            px: Sat {
+                pred: |t| t.chars().all(|c| c.is_digit(10)),
+            },
+            f: |s| s.parse::<i32>().unwrap(),
         }
         .parse(tokens)
     }
