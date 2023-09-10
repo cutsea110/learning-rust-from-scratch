@@ -946,6 +946,10 @@ pub fn spaces() -> impl Parser<Output = ()> + Clone {
     )
 }
 
+pub fn string() -> impl Parser<Output = String> + Clone {
+    satisfy(|_| true)
+}
+
 pub fn optional<T: Clone, P>(p: P) -> impl Parser<Output = Option<T>> + Clone
 where
     P: Parser<Output = T> + Clone,

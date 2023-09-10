@@ -10,10 +10,10 @@ fn jobs_cmd() -> impl Parser<Output = String> {
     literal("jobs")
 }
 
-fn fd_cmd() -> impl Parser<Output = String> {
-    literal("fd")
+fn fg_cmd() -> impl Parser<Output = i32> {
+    skip(literal("fd"), int32())
 }
 
 fn cd_cmd() -> impl Parser<Output = String> {
-    literal("cd")
+    skip(literal("cd"), string())
 }
