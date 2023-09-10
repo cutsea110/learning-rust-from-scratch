@@ -938,3 +938,10 @@ mod int32 {
         assert_eq!(p.parse(vec![(0, "foo".to_string())].into()), vec![]);
     }
 }
+
+pub fn spaces() -> impl Parser<Output = ()> {
+    apply(
+        munch1(satisfy(|s| s.chars().all(|c| c.is_whitespace()))),
+        |_| (),
+    )
+}
