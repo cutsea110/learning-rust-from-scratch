@@ -945,9 +945,42 @@ pub fn spaces() -> impl Parser<Output = ()> + Clone {
         |_| (),
     )
 }
+#[cfg(test)]
+mod spaces {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = spaces();
+        assert_eq!(
+            p.parse(vec![(0, " ".to_string())].into()),
+            vec![((), vec![].into())]
+        );
+        assert_eq!(
+            p.parse(vec![(0, "  ".to_string())].into()),
+            vec![((), vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "foo".to_string())].into()), vec![]);
+    }
+}
 
 pub fn string() -> impl Parser<Output = String> + Clone {
     satisfy(|_| true)
+}
+#[cfg(test)]
+mod string {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = string();
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![("foo".to_string(), vec![].into())]
+        );
+        assert_eq!(
+            p.parse(vec![(0, "foo bar".to_string())].into()),
+            vec![("foo bar".to_string(), vec![].into())]
+        );
+    }
 }
 
 pub fn optional<T: Clone, P>(p: P) -> impl Parser<Output = Option<T>> + Clone
@@ -955,4 +988,20 @@ where
     P: Parser<Output = T> + Clone,
 {
     altl(apply(p, |x| Some(x)), empty(None))
+}
+#[cfg(test)]
+mod optional {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = optional(literal("foo"));
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string())].into()),
+            vec![(Some("foo".to_string()), vec![].into())]
+        );
+        assert_eq!(
+            p.parse(vec![(0, "bar".to_string())].into()),
+            vec![(None, vec![(0, "bar".to_string())].into())]
+        );
+    }
 }
