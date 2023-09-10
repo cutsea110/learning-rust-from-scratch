@@ -28,13 +28,12 @@ where
         vec![]
     }
 }
-
 pub fn satisfy<F: Fn(String) -> bool>(pred: F) -> Sat<F> {
     Sat { pred }
 }
 
 #[derive(Debug, Clone)]
-struct Lit {
+pub struct Lit {
     s: &'static str,
 }
 impl Parser for Lit {
@@ -48,9 +47,12 @@ impl Parser for Lit {
         .parse(tokens)
     }
 }
+pub fn literal(s: &'static str) -> Lit {
+    Lit { s }
+}
 
 #[derive(Debug, Clone)]
-struct Empty<T: Clone>(T);
+pub struct Empty<T: Clone>(T);
 impl<T: Clone> Parser for Empty<T> {
     type Output = T;
 
@@ -58,9 +60,12 @@ impl<T: Clone> Parser for Empty<T> {
         vec![(self.0.clone(), tokens)]
     }
 }
+pub fn empty<T: Clone>(x: T) -> Empty<T> {
+    Empty(x)
+}
 
 #[derive(Debug, Clone)]
-struct Bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> {
+pub struct Bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> {
     px: P,
     f: F,
 }
@@ -77,9 +82,12 @@ impl<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> Parser for Bind<T, P, F
         result
     }
 }
+pub fn bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser>(px: P, f: F) -> Bind<T, P, F, Q> {
+    Bind { px, f }
+}
 
 #[derive(Debug, Clone)]
-struct Apply<T, U, P: Parser<Output = T>> {
+pub struct Apply<T, U, P: Parser<Output = T>> {
     px: P,
     f: fn(T) -> U,
 }
@@ -94,9 +102,12 @@ impl<T: Clone, U, P: Parser<Output = T>> Parser for Apply<T, U, P> {
         result
     }
 }
+pub fn apply<T, U, P: Parser<Output = T>>(px: P, f: fn(T) -> U) -> Apply<T, U, P> {
+    Apply { px, f }
+}
 
 #[derive(Debug, Clone)]
-struct Apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> {
+pub struct Apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> {
     px: P,
     qx: Q,
     f: fn(T, U) -> V,
@@ -116,9 +127,16 @@ impl<T: Clone, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> Parser
         result
     }
 }
+pub fn apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>>(
+    px: P,
+    qx: Q,
+    f: fn(T, U) -> V,
+) -> Apply2<T, U, V, P, Q> {
+    Apply2 { px, qx, f }
+}
 
 #[derive(Debug, Clone)]
-struct Alt<T, P: Parser<Output = T>, Q: Parser<Output = T>> {
+pub struct Alt<T, P: Parser<Output = T>, Q: Parser<Output = T>> {
     px: P,
     qx: Q,
 }
@@ -136,9 +154,12 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for Alt<T, P, Q> {
         result
     }
 }
+pub fn alt<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> Alt<T, P, Q> {
+    Alt { px, qx }
+}
 
 #[derive(Debug, Clone)]
-struct AltL<T, P: Parser<Output = T>, Q: Parser<Output = T>> {
+pub struct AltL<T, P: Parser<Output = T>, Q: Parser<Output = T>> {
     px: P,
     qx: Q,
 }
@@ -158,9 +179,12 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for AltL<T, P, Q> {
         result
     }
 }
+pub fn altl<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> AltL<T, P, Q> {
+    AltL { px, qx }
+}
 
 #[derive(Debug, Clone)]
-struct Ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> {
+pub struct Ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> {
     px: P,
     pf: Q,
 }
@@ -179,9 +203,15 @@ impl<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> Parser
         result
     }
 }
+pub fn ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>>(
+    px: P,
+    pf: Q,
+) -> Ap<T, U, F, P, Q> {
+    Ap { px, pf }
+}
 
 #[derive(Debug, Clone)]
-struct OneOrMore<T: Clone, P: Parser<Output = T>> {
+pub struct OneOrMore<T: Clone, P: Parser<Output = T>> {
     p: P,
 }
 impl<T: Clone, P: Parser<Output = T> + Clone> Parser for OneOrMore<T, P> {
@@ -199,9 +229,12 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for OneOrMore<T, P> {
         .parse(tokens)
     }
 }
+pub fn one_or_more<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> OneOrMore<T, P> {
+    OneOrMore { p }
+}
 
 #[derive(Debug, Clone)]
-struct ZeroOrMore<T: Clone, P: Parser<Output = T>> {
+pub struct ZeroOrMore<T: Clone, P: Parser<Output = T>> {
     p: P,
 }
 impl<T: Clone, P: Parser<Output = T> + Clone> Parser for ZeroOrMore<T, P> {
@@ -215,9 +248,12 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for ZeroOrMore<T, P> {
         .parse(tokens)
     }
 }
+pub fn zero_or_more<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> ZeroOrMore<T, P> {
+    ZeroOrMore { p }
+}
 
 #[derive(Debug, Clone)]
-struct Munch1<T: Clone, P: Parser<Output = T>> {
+pub struct Munch1<T: Clone, P: Parser<Output = T>> {
     px: P,
 }
 impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch1<T, P> {
@@ -237,9 +273,12 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch1<T, P> {
         .parse(tokens)
     }
 }
+pub fn munch1<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> Munch1<T, P> {
+    Munch1 { px: p }
+}
 
 #[derive(Debug, Clone)]
-struct Munch<T: Clone, P: Parser<Output = T>> {
+pub struct Munch<T: Clone, P: Parser<Output = T>> {
     px: P,
 }
 impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch<T, P> {
@@ -255,9 +294,12 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch<T, P> {
         .parse(tokens)
     }
 }
+pub fn munch<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> Munch<T, P> {
+    Munch { px: p }
+}
 
 #[derive(Debug, Clone)]
-struct With<T, P: Parser<Output = T>, Q: Parser> {
+pub struct With<T, P: Parser<Output = T>, Q: Parser> {
     p: P,
     with: Q,
 }
@@ -275,9 +317,15 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for With
         .parse(tokens)
     }
 }
+pub fn with<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
+    p: P,
+    with: Q,
+) -> With<T, P, Q> {
+    With { p, with }
+}
 
 #[derive(Debug, Clone)]
-struct Skip<T, Q: Parser, P: Parser<Output = T>> {
+pub struct Skip<T, Q: Parser, P: Parser<Output = T>> {
     skip: Q,
     p: P,
 }
@@ -292,9 +340,15 @@ impl<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone> Parser for Skip
         .parse(tokens)
     }
 }
+pub fn skip<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone>(
+    skip: Q,
+    p: P,
+) -> Skip<T, Q, P> {
+    Skip { skip, p }
+}
 
 #[derive(Debug, Clone)]
-struct OneOrMoreWithSep<T, P: Parser<Output = T>, Q: Parser> {
+pub struct OneOrMoreWithSep<T, P: Parser<Output = T>, Q: Parser> {
     p: P,
     sep: Q,
 }
@@ -320,9 +374,15 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser
         .parse(tokens)
     }
 }
+pub fn one_or_more_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
+    p: P,
+    sep: Q,
+) -> OneOrMoreWithSep<T, P, Q> {
+    OneOrMoreWithSep { p, sep }
+}
 
 #[derive(Debug, Clone)]
-struct Munch1WithSep<T, P: Parser<Output = T>, Q: Parser> {
+pub struct Munch1WithSep<T, P: Parser<Output = T>, Q: Parser> {
     p: P,
     sep: Q,
 }
@@ -346,9 +406,15 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for Munc
         .parse(tokens)
     }
 }
+pub fn munch1_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
+    p: P,
+    sep: Q,
+) -> Munch1WithSep<T, P, Q> {
+    Munch1WithSep { p, sep }
+}
 
 #[derive(Debug, Clone)]
-struct Int32;
+pub struct Int32;
 impl Parser for Int32 {
     type Output = i32;
 
@@ -361,4 +427,7 @@ impl Parser for Int32 {
         }
         .parse(tokens)
     }
+}
+pub fn int32() -> Int32 {
+    Int32
 }
