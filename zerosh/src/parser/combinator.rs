@@ -763,6 +763,75 @@ pub fn one_or_more_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser +
 ) -> OneOrMoreWithSep<T, P, Q> {
     OneOrMoreWithSep { p, sep }
 }
+#[cfg(test)]
+mod one_or_more_with_sep {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = one_or_more_with_sep(literal("foo"), literal(","));
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, ",".to_string()),
+                    (2, "foo".to_string()),
+                    (3, ",".to_string()),
+                    (4, "foo".to_string())
+                ]
+                .into()
+            ),
+            vec![
+                (
+                    vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+                    vec![].into()
+                ),
+                (
+                    vec!["foo".to_string(), "foo".to_string()],
+                    vec![(3, ",".to_string()), (4, "foo".to_string())].into()
+                ),
+                (
+                    vec!["foo".to_string()],
+                    vec![
+                        (1, ",".to_string()),
+                        (2, "foo".to_string()),
+                        (3, ",".to_string()),
+                        (4, "foo".to_string())
+                    ]
+                    .into()
+                )
+            ]
+        );
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, ",".to_string()),
+                    (2, "foo".to_string()),
+                    (3, ",".to_string()),
+                    (4, "bar".to_string())
+                ]
+                .into()
+            ),
+            vec![
+                (
+                    vec!["foo".to_string(), "foo".to_string()],
+                    vec![(3, ",".to_string()), (4, "bar".to_string())].into()
+                ),
+                (
+                    vec!["foo".to_string()],
+                    vec![
+                        (1, ",".to_string()),
+                        (2, "foo".to_string()),
+                        (3, ",".to_string()),
+                        (4, "bar".to_string())
+                    ]
+                    .into()
+                )
+            ]
+        );
+        assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Munch1WithSep<T, P: Parser<Output = T>, Q: Parser> {
@@ -795,6 +864,47 @@ pub fn munch1_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clon
 ) -> Munch1WithSep<T, P, Q> {
     Munch1WithSep { p, sep }
 }
+#[cfg(test)]
+mod munch1_with_sep {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = munch1_with_sep(literal("foo"), literal(","));
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, ",".to_string()),
+                    (2, "foo".to_string()),
+                    (3, ",".to_string()),
+                    (4, "foo".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+                vec![].into()
+            )]
+        );
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, ",".to_string()),
+                    (2, "foo".to_string()),
+                    (3, ",".to_string()),
+                    (4, "bar".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                vec!["foo".to_string(), "foo".to_string()],
+                vec![(3, ",".to_string()), (4, "bar".to_string())].into()
+            )]
+        );
+        assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Int32;
@@ -813,4 +923,18 @@ impl Parser for Int32 {
 }
 pub fn int32() -> Int32 {
     Int32
+}
+#[cfg(test)]
+mod int32 {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = int32();
+        assert_eq!(
+            p.parse(vec![(0, "123".to_string())].into()),
+            vec![(123, vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "123foo".to_string())].into()), vec![]);
+        assert_eq!(p.parse(vec![(0, "foo".to_string())].into()), vec![]);
+    }
 }
