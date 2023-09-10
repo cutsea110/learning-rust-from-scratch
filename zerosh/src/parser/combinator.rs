@@ -939,9 +939,16 @@ mod int32 {
     }
 }
 
-pub fn spaces() -> impl Parser<Output = ()> {
+pub fn spaces() -> impl Parser<Output = ()> + Clone {
     apply(
         munch1(satisfy(|s| s.chars().all(|c| c.is_whitespace()))),
         |_| (),
     )
+}
+
+pub fn optional<T: Clone, P>(p: P) -> impl Parser<Output = Option<T>> + Clone
+where
+    P: Parser<Output = T> + Clone,
+{
+    altl(apply(p, |x| Some(x)), empty(None))
 }
