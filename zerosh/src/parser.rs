@@ -1,0 +1,166 @@
+use std::collections::VecDeque;
+
+type Location = usize;
+type Token = (Location, String);
+
+trait Parser {
+    type Output;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)>;
+}
+
+struct Sat<F: Fn(String) -> bool> {
+    pred: F,
+}
+impl<F> Parser for Sat<F>
+where
+    F: Fn(String) -> bool,
+{
+    type Output = String;
+
+    fn parse(&self, mut tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        if let Some((_, token)) = tokens.pop_front() {
+            if (self.pred)(token.clone()) {
+                return vec![(token, tokens)];
+            }
+        }
+        vec![]
+    }
+}
+
+struct Lit {
+    s: &'static str,
+}
+impl Parser for Lit {
+    type Output = String;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let s = self.s;
+        Sat {
+            pred: Box::new(move |token| token == s),
+        }
+        .parse(tokens)
+    }
+}
+
+struct Empty<T: Clone>(T);
+impl<T: Clone> Parser for Empty<T> {
+    type Output = T;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        vec![(self.0.clone(), tokens)]
+    }
+}
+
+struct Bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> {
+    px: P,
+    f: F,
+}
+impl<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> Parser for Bind<T, P, F, Q> {
+    type Output = Q::Output;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let mut result = vec![];
+        for (x, tokens) in self.px.parse(tokens) {
+            for (y, tokens) in (self.f)(x).parse(tokens) {
+                result.push((y, tokens));
+            }
+        }
+        result
+    }
+}
+
+struct Apply<T, U, P: Parser<Output = T>> {
+    px: P,
+    f: fn(&T) -> U,
+}
+impl<T, U, P: Parser<Output = T>> Parser for Apply<T, U, P> {
+    type Output = U;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let mut result = vec![];
+        for (x, tokens) in self.px.parse(tokens) {
+            result.push(((self.f)(&x), tokens));
+        }
+        result
+    }
+}
+
+struct Apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> {
+    px: P,
+    qx: Q,
+    f: fn(&T, &U) -> V,
+}
+impl<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> Parser for Apply2<T, U, V, P, Q> {
+    type Output = V;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let mut result = vec![];
+        for (x, tokens) in self.px.parse(tokens.clone()) {
+            for (y, tokens) in self.qx.parse(tokens) {
+                result.push(((self.f)(&x, &y), tokens));
+            }
+        }
+        result
+    }
+}
+
+struct Alt<P: Parser> {
+    px: P,
+    qx: P,
+}
+impl<P: Parser> Parser for Alt<P> {
+    type Output = P::Output;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let mut result = vec![];
+        for (x, tokens) in self.px.parse(tokens.clone()) {
+            result.push((x, tokens));
+        }
+        for (x, tokens) in self.qx.parse(tokens) {
+            result.push((x, tokens));
+        }
+        result
+    }
+}
+
+struct AltL<P: Parser> {
+    px: P,
+    qx: P,
+}
+impl<P: Parser> Parser for AltL<P> {
+    type Output = P::Output;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let mut result = vec![];
+        for (x, tokens) in self.px.parse(tokens.clone()) {
+            result.push((x, tokens));
+        }
+        if result.is_empty() {
+            for (x, tokens) in self.qx.parse(tokens) {
+                result.push((x, tokens));
+            }
+        }
+        result
+    }
+}
+
+struct Ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> {
+    px: P,
+    pf: Q,
+}
+impl<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> Parser
+    for Ap<T, U, F, P, Q>
+{
+    type Output = U;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let mut result = vec![];
+        for (x, tokens) in self.px.parse(tokens.clone()) {
+            for (f, tokens) in self.pf.parse(tokens) {
+                result.push(((f)(&x), tokens));
+            }
+        }
+        result
+    }
+}

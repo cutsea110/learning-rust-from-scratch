@@ -1,4 +1,5 @@
 mod helper;
+mod parser;
 mod shell;
 
 use helper::DynError;
@@ -13,8 +14,8 @@ fn main() -> Result<(), DynError> {
         logfile = h.to_str().unwrap_or(HISTORY_FILE);
     }
 
-    // let sh = shell::Shell::new(logfile);
-    // sh.run()?;
+    let sh = shell::Shell::new(logfile);
+    sh.run()?;
 
     Ok(())
 }

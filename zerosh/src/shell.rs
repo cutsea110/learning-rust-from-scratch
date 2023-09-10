@@ -1,4 +1,5 @@
 use crate::helper::DynError;
+use crate::parser;
 use nix::{
     libc,
     sys::{
@@ -208,6 +209,8 @@ impl Worker {
                             }
                             Err(e) => {
                                 eprintln!("zerosh: {e}");
+                                // コマンドのパースに失敗した場合はシェルからの入力を再開するため
+                                // main スレッドに通知する
                                 shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
                             }
                         }
