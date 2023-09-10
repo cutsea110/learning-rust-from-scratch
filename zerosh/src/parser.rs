@@ -238,3 +238,38 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch<T, P> {
         .parse(tokens)
     }
 }
+
+struct With<T, P: Parser<Output = T>, Q: Parser> {
+    p: P,
+    with: Q,
+}
+impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for With<T, P, Q> {
+    type Output = T;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        Bind {
+            px: self.p.clone(),
+            f: |x| Bind {
+                px: self.with.clone(),
+                f: move |_| Empty(x.clone()),
+            },
+        }
+        .parse(tokens)
+    }
+}
+
+struct Skip<T, Q: Parser, P: Parser<Output = T>> {
+    skip: Q,
+    p: P,
+}
+impl<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone> Parser for Skip<T, Q, P> {
+    type Output = T;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        Bind {
+            px: self.skip.clone(),
+            f: |_| self.p.clone(),
+        }
+        .parse(tokens)
+    }
+}
