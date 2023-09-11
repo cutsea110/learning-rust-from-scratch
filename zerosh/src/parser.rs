@@ -389,3 +389,102 @@ mod test {
         );
     }
 }
+
+#[derive(Debug, PartialEq, Clone)]
+struct ExternalCmd {
+    cmd: String,
+    opts: Vec<String>,
+}
+
+fn is_separator(s: String) -> bool {
+    vec![
+        "&".to_string(),
+        "|".to_string(),
+        "(".to_string(),
+        ")".to_string(),
+        ";".to_string(),
+    ]
+    .contains(&s)
+}
+
+fn cmd_separator() -> impl Parser<Output = String> {
+    satisfy(is_separator)
+}
+
+fn external_cmd() -> impl Parser<Output = ExternalCmd> {
+    let symbol = satisfy(|s| !is_separator(s));
+    apply2(symbol.clone(), munch(symbol), |cmd, opts| ExternalCmd {
+        cmd,
+        opts,
+    })
+}
+#[cfg(test)]
+mod external_cmd {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            external_cmd().parse(vec![(0, "ls".to_string()), (1, "-laF".to_string())].into()),
+            vec![(
+                ExternalCmd {
+                    cmd: "ls".to_string(),
+                    opts: vec!["-laF".to_string()],
+                },
+                vec![].into()
+            )]
+        );
+        assert_eq!(
+            external_cmd().parse(
+                vec![
+                    (0, "ls".to_string()),
+                    (1, "-laF".to_string()),
+                    (2, "|".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                ExternalCmd {
+                    cmd: "ls".to_string(),
+                    opts: vec!["-laF".to_string()],
+                },
+                vec![(2, "|".to_string())].into()
+            )]
+        );
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Cmd {
+    BuiltIn(BuiltInCmd),
+    External(ExternalCmd),
+}
+
+fn command() -> impl Parser<Output = Cmd> {
+    altl(
+        apply(built_in_cmd(), Cmd::BuiltIn),
+        apply(external_cmd(), Cmd::External),
+    )
+}
+#[cfg(test)]
+mod command {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            command().parse(vec![(0, "ls".to_string()), (1, "-laF".to_string())].into()),
+            vec![(
+                Cmd::External(ExternalCmd {
+                    cmd: "ls".to_string(),
+                    opts: vec!["-laF".to_string()],
+                }),
+                vec![].into()
+            )]
+        );
+        assert_eq!(
+            command().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
+            vec![(Cmd::BuiltIn(BuiltInCmd::Exit(Some(1))), vec![].into())]
+        );
+    }
+}
