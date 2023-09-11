@@ -198,7 +198,7 @@ enum BuiltInCmd {
     Cd(String),
 }
 
-fn exit_cmd() -> impl Parser<Output = Option<i32>> {
+fn exit_cmd() -> impl Parser<Output = Option<i32>> + Clone {
     skip(literal("exit"), optional(int32()))
 }
 #[cfg(test)]
@@ -222,7 +222,7 @@ mod exit_cmd {
     }
 }
 
-fn jobs_cmd() -> impl Parser<Output = String> {
+fn jobs_cmd() -> impl Parser<Output = String> + Clone {
     literal("jobs")
 }
 #[cfg(test)]
@@ -246,7 +246,7 @@ mod jobs_cmd {
     }
 }
 
-fn fg_cmd() -> impl Parser<Output = i32> {
+fn fg_cmd() -> impl Parser<Output = i32> + Clone {
     skip(literal("fg"), int32())
 }
 #[cfg(test)]
@@ -292,7 +292,7 @@ mod dir_name {
     }
 }
 
-fn cd_cmd() -> impl Parser<Output = String> {
+fn cd_cmd() -> impl Parser<Output = String> + Clone {
     skip(literal("cd"), dir_name())
 }
 #[cfg(test)]
@@ -320,7 +320,7 @@ mod cd_cmd {
     }
 }
 
-fn built_in_cmd() -> impl Parser<Output = BuiltInCmd> {
+fn built_in_cmd() -> impl Parser<Output = BuiltInCmd> + Clone {
     altl(
         apply(exit_cmd(), BuiltInCmd::Exit),
         altl(
@@ -407,11 +407,11 @@ fn is_separator(s: String) -> bool {
     .contains(&s)
 }
 
-fn cmd_separator() -> impl Parser<Output = String> {
+fn cmd_separator() -> impl Parser<Output = String> + Clone {
     satisfy(is_separator)
 }
 
-fn external_cmd() -> impl Parser<Output = ExternalCmd> {
+fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
     let symbol = satisfy(|s| !is_separator(s));
     apply2(symbol.clone(), munch(symbol), |cmd, opts| ExternalCmd {
         cmd,
@@ -460,7 +460,7 @@ pub enum Cmd {
     External(ExternalCmd),
 }
 
-fn command() -> impl Parser<Output = Cmd> {
+fn command() -> impl Parser<Output = Cmd> + Clone {
     altl(
         apply(built_in_cmd(), Cmd::BuiltIn),
         apply(external_cmd(), Cmd::External),
@@ -485,6 +485,54 @@ mod command {
         assert_eq!(
             command().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
             vec![(Cmd::BuiltIn(BuiltInCmd::Exit(Some(1))), vec![].into())]
+        );
+    }
+}
+
+fn pipe() -> impl Parser<Output = ()> + Clone {
+    apply(literal("|"), |_| ())
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct Job {
+    cmds: Vec<Cmd>,
+}
+
+fn job() -> impl Parser<Output = Job> + Clone {
+    apply(munch1_with_sep(command(), pipe()), |cmds| Job { cmds })
+}
+#[cfg(test)]
+mod job {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            job().parse(
+                vec![
+                    (0, "ls".to_string()),
+                    (1, "-laF".to_string()),
+                    (2, "|".to_string()),
+                    (3, "grep".to_string()),
+                    (4, "'a'".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                Job {
+                    cmds: vec![
+                        Cmd::External(ExternalCmd {
+                            cmd: "ls".to_string(),
+                            opts: vec!["-laF".to_string()],
+                        }),
+                        Cmd::External(ExternalCmd {
+                            cmd: "grep".to_string(),
+                            opts: vec!["'a'".to_string()],
+                        })
+                    ]
+                },
+                vec![].into()
+            )]
         );
     }
 }
