@@ -360,6 +360,25 @@ pub fn ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>>(
 ) -> Ap<T, U, F, P, Q> {
     Ap { px, pf }
 }
+#[cfg(test)]
+mod ap {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = ap(
+            literal("hello"),
+            empty(|x: &String| x.to_string() + "world"),
+        );
+        assert_eq!(
+            p.parse(vec![(0, "hello".to_string()), (1, "foo".to_string())].into()),
+            vec![(
+                "helloworld".to_string(),
+                vec![(1, "foo".to_string())].into()
+            )]
+        );
+        assert_eq!(p.parse(vec![(0, "foo".to_string())].into()), vec![]);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct OneOrMore<T: Clone, P: Parser<Output = T>> {
