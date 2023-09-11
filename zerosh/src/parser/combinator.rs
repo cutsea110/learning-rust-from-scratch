@@ -1024,3 +1024,102 @@ mod optional {
         );
     }
 }
+
+pub fn bracket<T: Clone, L, P, R>(l: L, p: P, r: R) -> impl Parser<Output = T> + Clone
+where
+    L: Parser + Clone,
+    P: Parser<Output = T> + Clone,
+    R: Parser + Clone,
+{
+    skip(l, with(p, r))
+}
+#[cfg(test)]
+mod bracket {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = bracket(literal("("), literal("foo"), literal(")"));
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "(".to_string()),
+                    (1, "foo".to_string()),
+                    (2, ")".to_string())
+                ]
+                .into()
+            ),
+            vec![("foo".to_string(), vec![].into())]
+        );
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "(".to_string()),
+                    (1, "bar".to_string()),
+                    (2, ")".to_string())
+                ]
+                .into()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, "(".to_string()),
+                    (2, ")".to_string())
+                ]
+                .into()
+            ),
+            vec![]
+        );
+    }
+}
+
+pub fn parens<T: Clone, P>(p: P) -> impl Parser<Output = T> + Clone
+where
+    P: Parser<Output = T> + Clone,
+{
+    bracket(literal("("), p, literal(")"))
+}
+
+#[cfg(test)]
+mod parens {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = parens(literal("foo"));
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "(".to_string()),
+                    (1, "foo".to_string()),
+                    (2, ")".to_string())
+                ]
+                .into()
+            ),
+            vec![("foo".to_string(), vec![].into())]
+        );
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "(".to_string()),
+                    (1, "bar".to_string()),
+                    (2, ")".to_string())
+                ]
+                .into()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            p.parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, "(".to_string()),
+                    (2, ")".to_string())
+                ]
+                .into()
+            ),
+            vec![]
+        );
+    }
+}
