@@ -1,6 +1,7 @@
 mod combinator;
 
 use combinator::*;
+use std::mem::take;
 
 fn tokenize(line: &str) -> Vec<String> {
     let mut result = vec![];
@@ -12,12 +13,12 @@ fn tokenize(line: &str) -> Vec<String> {
             // 空白読み飛ばし
             ' ' | '\t' => {
                 if token.len() > 0 {
-                    result.push(token);
-                    token = String::new();
+                    result.push(take(&mut token));
                 }
             }
-            // エスケープ
+            // コマンドライン中のエスケープ(文字列の中ではなく)
             '\\' => {
+                println!("FOUND!");
                 let c = chars.next().unwrap();
                 token.push(c);
             }
@@ -26,34 +27,46 @@ fn tokenize(line: &str) -> Vec<String> {
                 let quote = c; // クローズ用に取っておく
 
                 if token.len() > 0 {
-                    result.push(token);
-                    token = String::new();
+                    result.push(take(&mut token));
                 }
 
-                token.push(c);
+                token.push(quote);
 
                 while let Some(c) = chars.next() {
                     if c == quote {
-                        token.push(c);
-                        result.push(token);
-                        token = String::new();
+                        token.push(quote);
+                        result.push(take(&mut token));
                         break;
                     }
                     match c {
                         '\\' => {
-                            token.push(c);
+                            token.push('\\');
                             token.push(chars.next().unwrap())
                         }
-                        _ => {
-                            token.push(c);
-                        }
+                        _ => token.push(c),
                     }
                 }
             }
-            '&' | '|' | '(' | ')' | ';' => {
+            // & もしくは && の場合
+            '&' => {
                 if token.len() > 0 {
-                    result.push(token);
-                    token = String::new();
+                    result.push(take(&mut token));
+                }
+
+                if let Some(&c) = chars.peek() {
+                    if c == '&' {
+                        chars.next();
+                        result.push("&&".to_string());
+                        continue;
+                    }
+                }
+
+                result.push("&".to_string());
+            }
+            // これらは 1 文字トークン
+            '|' | '(' | ')' | ';' => {
+                if token.len() > 0 {
+                    result.push(take(&mut token));
                 }
                 result.push(c.to_string())
             }
@@ -96,6 +109,12 @@ mod tokenize {
             tokenize("cd ./home | (make build; make test)"),
             vec!["cd", "./home", "|", "(", "make", "build", ";", "make", "test", ")"]
         );
+        assert_eq!(tokenize("foo && bar"), vec!["foo", "&&", "bar"]);
+        assert_eq!(tokenize("foo & & bar"), vec!["foo", "&", "&", "bar"]);
+        assert_eq!(tokenize("foo & bar"), vec!["foo", "&", "bar"]);
+        assert_eq!(tokenize("foo\0"), vec!["foo\0"]);
+        assert_eq!(tokenize("foo\t"), vec!["foo"]);
+        assert_eq!(tokenize("foo\n"), vec!["foo\n"]);
     }
 }
 
@@ -180,7 +199,7 @@ mod fg_cmd {
 }
 
 fn dir_name() -> impl Parser<Output = String> + Clone {
-    satisfy(|s| !s.chars().any(|c| "&|()".contains(c)))
+    satisfy(|s| !s.chars().any(|c| "&|();".contains(c)))
 }
 #[cfg(test)]
 mod dir_name {
