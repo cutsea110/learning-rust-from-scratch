@@ -3,7 +3,8 @@ mod combinator;
 use combinator::*;
 use std::mem::take;
 
-fn tokenize(line: &str) -> Vec<String> {
+fn tokenize(line: &str) -> Vec<(usize, String)> {
+    let len = line.len();
     let mut result = vec![];
     let mut chars = line.chars().peekable();
     let mut token = String::new();
@@ -13,12 +14,15 @@ fn tokenize(line: &str) -> Vec<String> {
             // 空白読み飛ばし
             ' ' | '\t' => {
                 if token.len() > 0 {
-                    result.push(take(&mut token));
+                    result.push((
+                        len - chars.clone().count() - token.len() - 1,
+                        take(&mut token),
+                    ));
                 }
             }
             // コマンドライン中のエスケープ(文字列の中ではなく)
             '\\' => {
-                println!("FOUND!");
+                token.push('\\');
                 let c = chars.next().unwrap();
                 token.push(c);
             }
@@ -27,7 +31,10 @@ fn tokenize(line: &str) -> Vec<String> {
                 let quote = c; // クローズ用に取っておく
 
                 if token.len() > 0 {
-                    result.push(take(&mut token));
+                    result.push((
+                        len - chars.clone().count() - token.len() - 1,
+                        take(&mut token),
+                    ));
                 }
 
                 token.push(quote);
@@ -35,7 +42,7 @@ fn tokenize(line: &str) -> Vec<String> {
                 while let Some(c) = chars.next() {
                     if c == quote {
                         token.push(quote);
-                        result.push(take(&mut token));
+                        result.push((len - chars.clone().count() - token.len(), take(&mut token)));
                         break;
                     }
                     match c {
@@ -50,31 +57,37 @@ fn tokenize(line: &str) -> Vec<String> {
             // & もしくは && の場合
             '&' => {
                 if token.len() > 0 {
-                    result.push(take(&mut token));
+                    result.push((
+                        len - chars.clone().count() - token.len() - 1,
+                        take(&mut token),
+                    ));
                 }
 
                 if let Some(&c) = chars.peek() {
                     if c == '&' {
                         chars.next();
-                        result.push("&&".to_string());
+                        result.push((len - chars.clone().count() - 2, "&&".to_string()));
                         continue;
                     }
                 }
 
-                result.push("&".to_string());
+                result.push((len - chars.clone().count() - 1, "&".to_string()));
             }
             // これらは 1 文字トークン
             '|' | '(' | ')' | ';' => {
                 if token.len() > 0 {
-                    result.push(take(&mut token));
+                    result.push((
+                        len - chars.clone().count() - token.len() - 1,
+                        take(&mut token),
+                    ));
                 }
-                result.push(c.to_string())
+                result.push((len - chars.clone().count() - 1, c.to_string()))
             }
             _ => token.push(c),
         }
     }
     if token.len() > 0 {
-        result.push(token);
+        result.push((len - chars.clone().count() - token.len(), token.to_string()));
     }
     result
 }
@@ -84,37 +97,96 @@ mod tokenize {
 
     #[test]
     fn test() {
-        assert_eq!(tokenize("foo"), vec!["foo"]);
-        assert_eq!(tokenize(" foo"), vec!["foo"]);
-        assert_eq!(tokenize("\tfoo"), vec!["foo"]);
-        assert_eq!(tokenize("foo bar buz"), vec!["foo", "bar", "buz"]);
+        assert_eq!(tokenize("foo"), vec![(0, "foo".to_string())]);
+        assert_eq!(tokenize(" foo"), vec![(1, "foo".to_string())]);
+        assert_eq!(tokenize("\tfoo"), vec![(1, "foo".to_string())]);
+        assert_eq!(
+            tokenize("foo bar buz"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "bar".to_string()),
+                (8, "buz".to_string())
+            ]
+        );
         assert_eq!(
             tokenize("echo \"hello, world\""),
-            vec!["echo", "\"hello, world\""]
+            vec![(0, "echo".to_string()), (5, "\"hello, world\"".to_string())]
         );
         assert_eq!(
             tokenize("echo 'hello, world'"),
-            vec!["echo", "'hello, world'"]
+            vec![(0, "echo".to_string()), (5, "'hello, world'".to_string())]
         );
-        assert_eq!(tokenize("echo test&"), vec!["echo", "test", "&"]);
+        assert_eq!(
+            tokenize("echo test&"),
+            vec![
+                (0, "echo".to_string()),
+                (5, "test".to_string()),
+                (9, "&".to_string())
+            ]
+        );
         assert_eq!(
             tokenize("echo \"test\'s\"|grep test"),
-            vec!["echo", "\"test's\"", "|", "grep", "test"]
+            vec![
+                (0, "echo".to_string()),
+                (5, "\"test's\"".to_string()),
+                (13, "|".to_string()),
+                (14, "grep".to_string()),
+                (19, "test".to_string())
+            ]
         );
         assert_eq!(
             tokenize("echo test\\'s|grep test"),
-            vec!["echo", "test\'s", "|", "grep", "test"]
+            vec![
+                (0, "echo".to_string()),
+                (5, "test\\'s".to_string()),
+                (12, "|".to_string()),
+                (13, "grep".to_string()),
+                (18, "test".to_string())
+            ]
         );
         assert_eq!(
             tokenize("cd ./home | (make build; make test)"),
-            vec!["cd", "./home", "|", "(", "make", "build", ";", "make", "test", ")"]
+            vec![
+                (0, "cd".to_string()),
+                (3, "./home".to_string()),
+                (10, "|".to_string()),
+                (12, "(".to_string()),
+                (13, "make".to_string()),
+                (18, "build".to_string()),
+                (23, ";".to_string()),
+                (25, "make".to_string()),
+                (30, "test".to_string()),
+                (34, ")".to_string())
+            ]
         );
-        assert_eq!(tokenize("foo && bar"), vec!["foo", "&&", "bar"]);
-        assert_eq!(tokenize("foo & & bar"), vec!["foo", "&", "&", "bar"]);
-        assert_eq!(tokenize("foo & bar"), vec!["foo", "&", "bar"]);
-        assert_eq!(tokenize("foo\0"), vec!["foo\0"]);
-        assert_eq!(tokenize("foo\t"), vec!["foo"]);
-        assert_eq!(tokenize("foo\n"), vec!["foo\n"]);
+        assert_eq!(
+            tokenize("foo && bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "&&".to_string()),
+                (7, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo & & bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "&".to_string()),
+                (6, "&".to_string()),
+                (8, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo & bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "&".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(tokenize("foo\0"), vec![(0, "foo\0".to_string())]);
+        assert_eq!(tokenize("foo\t"), vec![(0, "foo".to_string())]);
+        assert_eq!(tokenize("foo\n"), vec![(0, "foo\n".to_string())]);
     }
 }
 
@@ -285,6 +357,34 @@ mod build_in_cmd {
         assert_eq!(
             build_in_cmd().parse(vec![(0, "cd".to_string()), (1, "~/app".to_string())].into()),
             vec![(BuiltInCmd::Cd("~/app".to_string()), vec![].into())]
+        );
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            build_in_cmd().parse(tokenize("exit 1; (ls | grep 'a')& cd ~/app").into()),
+            vec![(
+                BuiltInCmd::Exit(Some(1)),
+                vec![
+                    (6, ";".to_string()),
+                    (8, "(".to_string()),
+                    (9, "ls".to_string()),
+                    (12, "|".to_string()),
+                    (14, "grep".to_string()),
+                    (19, "'a'".to_string()),
+                    (22, ")".to_string()),
+                    (23, "&".to_string()),
+                    (25, "cd".to_string()),
+                    (28, "~/app".to_string())
+                ]
+                .into()
+            )]
         );
     }
 }
