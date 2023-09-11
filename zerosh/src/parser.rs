@@ -368,20 +368,21 @@ mod test {
     #[test]
     fn test() {
         assert_eq!(
-            build_in_cmd().parse(tokenize("exit 1; (ls | grep 'a')& cd ~/app").into()),
+            build_in_cmd().parse(tokenize("exit 1; (ls -laF | grep 'a')& cd ~/app").into()),
             vec![(
                 BuiltInCmd::Exit(Some(1)),
                 vec![
                     (6, ";".to_string()),
                     (8, "(".to_string()),
                     (9, "ls".to_string()),
-                    (12, "|".to_string()),
-                    (14, "grep".to_string()),
-                    (19, "'a'".to_string()),
-                    (22, ")".to_string()),
-                    (23, "&".to_string()),
-                    (25, "cd".to_string()),
-                    (28, "~/app".to_string())
+                    (12, "-laF".to_string()),
+                    (17, "|".to_string()),
+                    (19, "grep".to_string()),
+                    (24, "'a'".to_string()),
+                    (27, ")".to_string()),
+                    (28, "&".to_string()),
+                    (30, "cd".to_string()),
+                    (33, "~/app".to_string())
                 ]
                 .into()
             )]
