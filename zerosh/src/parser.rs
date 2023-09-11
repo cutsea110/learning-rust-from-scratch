@@ -180,7 +180,7 @@ mod fg_cmd {
 }
 
 fn dir_name() -> impl Parser<Output = String> + Clone {
-    satisfy(|s| s.chars().all(|c| !"&|()".contains(c)))
+    satisfy(|s| !s.chars().any(|c| "&|()".contains(c)))
 }
 #[cfg(test)]
 mod dir_name {
