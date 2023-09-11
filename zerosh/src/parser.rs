@@ -13,6 +13,26 @@ enum BuiltInCmd {
 fn exit_cmd() -> impl Parser<Output = Option<i32>> {
     skip(literal("exit"), optional(int32()))
 }
+#[cfg(test)]
+mod exit_cmd {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            exit_cmd().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
+            vec![(Some(1), vec![].into())]
+        );
+        assert_eq!(
+            exit_cmd().parse(vec![(0, "exit".to_string()), (1, "&".to_string())].into()),
+            vec![(None, vec![(1, "&".to_string())].into())]
+        );
+        assert_eq!(
+            exit_cmd().parse(vec![(0, "exit".to_string()), (1, "|".to_string())].into()),
+            vec![(None, vec![(1, "|".to_string())].into())]
+        );
+    }
+}
 
 fn jobs_cmd() -> impl Parser<Output = String> {
     literal("jobs")
