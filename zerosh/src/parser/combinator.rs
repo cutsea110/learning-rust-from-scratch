@@ -848,6 +848,10 @@ mod one_or_more_with_sep {
                 )
             ]
         );
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string()),].into()),
+            vec![(vec!["foo".to_string()], vec![(1, "bar".to_string())].into()),]
+        );
         assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
     }
 }
