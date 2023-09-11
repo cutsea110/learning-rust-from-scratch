@@ -320,7 +320,7 @@ mod cd_cmd {
     }
 }
 
-fn build_in_cmd() -> impl Parser<Output = BuiltInCmd> {
+fn built_in_cmd() -> impl Parser<Output = BuiltInCmd> {
     altl(
         apply(exit_cmd(), BuiltInCmd::Exit),
         altl(
@@ -333,29 +333,29 @@ fn build_in_cmd() -> impl Parser<Output = BuiltInCmd> {
     )
 }
 #[cfg(test)]
-mod build_in_cmd {
+mod built_in_cmd {
     use super::*;
 
     #[test]
     fn test() {
         assert_eq!(
-            build_in_cmd().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
+            built_in_cmd().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
             vec![(BuiltInCmd::Exit(Some(1)), vec![].into())]
         );
         assert_eq!(
-            build_in_cmd().parse(vec![(0, "exit".to_string()), (1, ";".to_string())].into()),
+            built_in_cmd().parse(vec![(0, "exit".to_string()), (1, ";".to_string())].into()),
             vec![(BuiltInCmd::Exit(None), vec![(1, ";".to_string())].into())]
         );
         assert_eq!(
-            build_in_cmd().parse(vec![(0, "jobs".to_string())].into()),
+            built_in_cmd().parse(vec![(0, "jobs".to_string())].into()),
             vec![(BuiltInCmd::Jobs, vec![].into())]
         );
         assert_eq!(
-            build_in_cmd().parse(vec![(0, "fg".to_string()), (1, "1".to_string())].into()),
+            built_in_cmd().parse(vec![(0, "fg".to_string()), (1, "1".to_string())].into()),
             vec![(BuiltInCmd::Fg(1), vec![].into())]
         );
         assert_eq!(
-            build_in_cmd().parse(vec![(0, "cd".to_string()), (1, "~/app".to_string())].into()),
+            built_in_cmd().parse(vec![(0, "cd".to_string()), (1, "~/app".to_string())].into()),
             vec![(BuiltInCmd::Cd("~/app".to_string()), vec![].into())]
         );
     }
@@ -368,7 +368,7 @@ mod test {
     #[test]
     fn test() {
         assert_eq!(
-            build_in_cmd().parse(tokenize("exit 1; (ls -laF | grep 'a')& cd ~/app").into()),
+            built_in_cmd().parse(tokenize("exit 1; (ls -laF | grep 'a')& cd ~/app").into()),
             vec![(
                 BuiltInCmd::Exit(Some(1)),
                 vec![
