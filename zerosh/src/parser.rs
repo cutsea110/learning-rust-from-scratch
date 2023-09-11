@@ -99,7 +99,7 @@ mod tokenize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum BuiltInCmd {
     Exit(Option<i32>),
     Jobs,
@@ -180,7 +180,7 @@ mod fg_cmd {
 }
 
 fn dir_name() -> impl Parser<Output = String> + Clone {
-    satisfy(|s| s.chars().all(|c| !"&|<>".contains(c)))
+    satisfy(|s| s.chars().all(|c| !"&|()".contains(c)))
 }
 #[cfg(test)]
 mod dir_name {
@@ -240,4 +240,32 @@ fn build_in_cmd() -> impl Parser<Output = BuiltInCmd> {
             ),
         ),
     )
+}
+#[cfg(test)]
+mod build_in_cmd {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            build_in_cmd().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
+            vec![(BuiltInCmd::Exit(Some(1)), vec![].into())]
+        );
+        assert_eq!(
+            build_in_cmd().parse(vec![(0, "exit".to_string()), (1, ";".to_string())].into()),
+            vec![(BuiltInCmd::Exit(None), vec![(1, ";".to_string())].into())]
+        );
+        assert_eq!(
+            build_in_cmd().parse(vec![(0, "jobs".to_string())].into()),
+            vec![(BuiltInCmd::Jobs, vec![].into())]
+        );
+        assert_eq!(
+            build_in_cmd().parse(vec![(0, "fg".to_string()), (1, "1".to_string())].into()),
+            vec![(BuiltInCmd::Fg(1), vec![].into())]
+        );
+        assert_eq!(
+            build_in_cmd().parse(vec![(0, "cd".to_string()), (1, "~/app".to_string())].into()),
+            vec![(BuiltInCmd::Cd("~/app".to_string()), vec![].into())]
+        );
+    }
 }
