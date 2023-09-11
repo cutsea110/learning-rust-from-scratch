@@ -1024,3 +1024,28 @@ mod optional {
         );
     }
 }
+
+#[derive(Debug, Clone)]
+struct Choice<P: Parser> {
+    ps: Vec<P>,
+}
+impl<P: Parser + Clone> Parser for Choice<P> {
+    type Output = <P as Parser>::Output;
+
+    fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
+        let p = self.ps.get(0).unwrap();
+
+        AltL {
+            px: p.clone(),
+            qx: Choice {
+                ps: self.ps.clone(),
+            },
+        }
+        .parse(tokens)
+    }
+}
+fn choice<P: Parser + Clone>(ps: Vec<P>) -> Choice<P> {
+    assert!(!ps.is_empty());
+
+    Choice { ps }
+}
