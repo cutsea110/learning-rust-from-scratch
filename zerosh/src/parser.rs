@@ -21,9 +21,10 @@
 mod combinator;
 
 use combinator::*;
-use std::mem::take;
 
 fn tokenize(line: &str) -> Vec<(usize, String)> {
+    use std::mem::take;
+
     let len = line.len();
     let mut result = vec![];
     let mut chars = line.chars().peekable();
@@ -510,7 +511,7 @@ fn pipe() -> impl Parser<Output = ()> + Clone {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct Job {
+pub struct Job {
     cmds: Vec<Cmd>,
     is_bg: bool,
 }
@@ -590,5 +591,94 @@ mod job {
                 vec![].into()
             )]
         );
+    }
+}
+
+fn parse_cmd() -> impl Parser<Output = Vec<Job>> + Clone {
+    munch(job())
+}
+#[cfg(test)]
+mod parse_cmd {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            parse_cmd().parse(
+                vec![
+                    (0, "ls".to_string()),
+                    (1, "-laF".to_string()),
+                    (2, "|".to_string()),
+                    (3, "grep".to_string()),
+                    (4, "'a'".to_string()),
+                    (5, "&".to_string()),
+                    (6, "cd".to_string()),
+                    (7, "~/app".to_string()),
+                    (8, "&".to_string()),
+                    (9, "exit".to_string()),
+                    (10, "1".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                vec![
+                    Job {
+                        cmds: vec![
+                            Cmd::External(ExternalCmd {
+                                cmd: "ls".to_string(),
+                                opts: vec!["-laF".to_string()],
+                            }),
+                            Cmd::External(ExternalCmd {
+                                cmd: "grep".to_string(),
+                                opts: vec!["'a'".to_string()],
+                            })
+                        ],
+                        is_bg: true,
+                    },
+                    Job {
+                        cmds: vec![Cmd::BuiltIn(BuiltInCmd::Cd("~/app".to_string())),],
+                        is_bg: true,
+                    },
+                    Job {
+                        cmds: vec![Cmd::BuiltIn(BuiltInCmd::Exit(Some(1)))],
+                        is_bg: false,
+                    }
+                ],
+                vec![].into()
+            )]
+        );
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ParseError {
+    Invalid,
+    Unknown,
+    Unexpected,
+}
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ParseError::Invalid => write!(f, "invalid"),
+            ParseError::Unknown => write!(f, "unknown"),
+            ParseError::Unexpected => write!(f, "unexpected"),
+        }
+    }
+}
+impl std::error::Error for ParseError {}
+
+pub fn parse(line: &str) -> Result<Vec<Job>, ParseError> {
+    let tokens = tokenize(line);
+    let mut jobs = parse_cmd().parse(tokens.into());
+
+    match jobs.pop() {
+        Some((jobs, rest)) => {
+            if rest.is_empty() {
+                Ok(jobs)
+            } else {
+                Err(ParseError::Unknown)
+            }
+        }
+        None => Err(ParseError::Invalid),
     }
 }
