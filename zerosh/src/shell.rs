@@ -244,6 +244,32 @@ impl Worker {
         is_bg: bool,
         shell_tx: &SyncSender<ShellMsg>,
     ) -> bool {
+        match cmd {
+            model::BuiltInCmd::Exit(n) => self.run_exit(&n, shell_tx),
+            model::BuiltInCmd::Jobs => self.run_jobs(shell_tx),
+            model::BuiltInCmd::Fg(n) => self.run_fg(&n, shell_tx),
+            model::BuiltInCmd::Cd(path) => self.run_cd(path),
+        };
+        true
+    }
+
+    /// 終了コマンドを実行
+    fn run_exit(&mut self, n: &Option<i32>, shell_tx: &SyncSender<ShellMsg>) -> bool {
+        todo!()
+    }
+
+    /// ジョブ一覧を表示
+    fn run_jobs(&mut self, shell_tx: &SyncSender<ShellMsg>) -> bool {
+        todo!()
+    }
+
+    /// フォアグラウンド実行
+    fn run_fg(&mut self, n: &i32, shell_tx: &SyncSender<ShellMsg>) -> bool {
+        todo!()
+    }
+
+    /// ディレクトリ移動
+    fn run_cd(&mut self, path: &str) -> bool {
         todo!()
     }
 
