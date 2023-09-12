@@ -1,3 +1,7 @@
+//! Parser for shell command line.
+//!
+//! # BNF
+//!
 mod combinator;
 
 use combinator::*;
