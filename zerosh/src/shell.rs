@@ -275,7 +275,23 @@ impl Worker {
 
     /// フォアグラウンド実行
     fn run_fg(&mut self, n: &i32, shell_tx: &SyncSender<ShellMsg>) -> bool {
-        todo!()
+        self.exit_val = 1; // とりあえず失敗に設定
+        if let Some((pgid, cmd)) = self.jobs.get(&(*n as usize)) {
+            eprintln!("[{n}]: Restart\t{cmd}");
+
+            // フォアグラウンドプロセスに設定
+            self.fg = Some(*pgid);
+            tcsetpgrp(libc::STDIN_FILENO, *pgid).unwrap();
+
+            // ジョブの実行を再開
+            killpg(*pgid, Signal::SIGCONT).unwrap();
+            return true;
+        }
+
+        // 失敗
+        eprintln!("job {n} not found");
+        shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap(); // シェルからの入力を再開
+        true
     }
 
     /// ディレクトリ移動
