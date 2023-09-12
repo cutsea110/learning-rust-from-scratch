@@ -516,9 +516,11 @@ struct Job {
 }
 
 fn job() -> impl Parser<Output = Job> + Clone {
-    apply(munch1_with_sep(command(), pipe()), |cmds| Job {
-        cmds,
-        is_bg: false,
+    bind(munch1_with_sep(command(), pipe()), |cmds| {
+        apply(optional(literal("&")), move |bg| Job {
+            cmds: cmds.clone(),
+            is_bg: bg.is_some(),
+        })
     })
 }
 #[cfg(test)]
