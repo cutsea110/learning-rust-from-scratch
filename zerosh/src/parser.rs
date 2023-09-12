@@ -516,6 +516,30 @@ mod job {
                 vec![].into()
             )]
         );
+        assert_eq!(
+            job().parse(
+                vec![
+                    (0, "exit".to_string()),
+                    (1, "42".to_string()),
+                    (2, "|".to_string()),
+                    (3, "grep".to_string()),
+                    (4, "'a'".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                Job::BuiltIn {
+                    cmd: BuiltInCmd::Exit(Some(42)),
+                    is_bg: false,
+                },
+                vec![
+                    (2, "|".to_string()),
+                    (3, "grep".to_string()),
+                    (4, "'a'".to_string())
+                ]
+                .into()
+            )]
+        );
     }
 
     #[test]
@@ -547,6 +571,31 @@ mod job {
                     is_bg: true,
                 },
                 vec![].into()
+            )]
+        );
+        assert_eq!(
+            job().parse(
+                vec![
+                    (0, "exit".to_string()),
+                    (1, "42".to_string()),
+                    (2, "&".to_string()),
+                    (3, "grep".to_string()),
+                    (4, "'a'".to_string()),
+                    (5, "&".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                Job::BuiltIn {
+                    cmd: BuiltInCmd::Exit(Some(42)),
+                    is_bg: true,
+                },
+                vec![
+                    (3, "grep".to_string()),
+                    (4, "'a'".to_string()),
+                    (5, "&".to_string())
+                ]
+                .into()
             )]
         );
     }
