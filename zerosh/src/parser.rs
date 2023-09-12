@@ -528,7 +528,7 @@ mod job {
     use super::*;
 
     #[test]
-    fn test() {
+    fn fg_job() {
         assert_eq!(
             job().parse(
                 vec![
@@ -553,6 +553,39 @@ mod job {
                         })
                     ],
                     is_bg: false,
+                },
+                vec![].into()
+            )]
+        );
+    }
+
+    #[test]
+    fn bg_job() {
+        assert_eq!(
+            job().parse(
+                vec![
+                    (0, "ls".to_string()),
+                    (1, "-laF".to_string()),
+                    (2, "|".to_string()),
+                    (3, "grep".to_string()),
+                    (4, "'a'".to_string()),
+                    (5, "&".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                Job {
+                    cmds: vec![
+                        Cmd::External(ExternalCmd {
+                            cmd: "ls".to_string(),
+                            opts: vec!["-laF".to_string()],
+                        }),
+                        Cmd::External(ExternalCmd {
+                            cmd: "grep".to_string(),
+                            opts: vec!["'a'".to_string()],
+                        })
+                    ],
+                    is_bg: true,
                 },
                 vec![].into()
             )]
