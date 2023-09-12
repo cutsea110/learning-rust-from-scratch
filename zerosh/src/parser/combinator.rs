@@ -1,3 +1,16 @@
+//! Parser combinators.
+//!
+//! # Examples
+//!
+//! ```
+//! use parser_combinators::*;
+//! let p = bind(literal("foo"), |s| empty(s.len()));
+//! assert_eq!(
+//!     p.parse(vec![(0, "foo".to_string())].into()),
+//!     vec![(3, vec![].into())]
+//! );
+//! assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+//! ```
 use std::collections::VecDeque;
 
 pub type Location = usize;
@@ -28,6 +41,19 @@ where
         vec![]
     }
 }
+/// Satisfies the given predicate.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = satisfy(|s| s == "foo");
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string())].into()),
+///     vec![("foo".to_string(), vec![].into())]
+/// );
+/// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+/// ```
 pub fn satisfy<F: Fn(String) -> bool>(pred: F) -> Sat<F> {
     Sat { pred }
 }
@@ -60,6 +86,19 @@ impl Parser for Lit {
         .parse(tokens)
     }
 }
+/// Parses the given literal.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = literal("foo");
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string())].into()),
+///     vec![("foo".to_string(), vec![].into())]
+/// );
+/// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+/// ```
 pub fn literal(s: &'static str) -> Lit {
     Lit { s }
 }
@@ -86,6 +125,18 @@ impl<T: Clone> Parser for Empty<T> {
         vec![(self.0.clone(), tokens)]
     }
 }
+/// Always succeeds with the given value.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = empty(42);
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string())].into()),
+///     vec![(42, vec![(0, "foo".to_string())].into())]
+/// );
+/// ```
 pub fn empty<T: Clone>(x: T) -> Empty<T> {
     Empty(x)
 }
@@ -120,6 +171,19 @@ impl<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> Parser for Bind<T, P, F
         result
     }
 }
+/// Binds the result of the given parser to the given function.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = bind(literal("foo"), |s| empty(s.len()));
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string())].into()),
+///     vec![(3, vec![].into())]
+/// );
+/// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+/// ```
 pub fn bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser>(px: P, f: F) -> Bind<T, P, F, Q> {
     Bind { px, f }
 }
@@ -153,6 +217,19 @@ impl<T: Clone, U, P: Parser<Output = T>> Parser for Apply<T, U, P> {
         result
     }
 }
+/// Applies the given function to the result of the given parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = apply(int32(), |n| n * 2);
+/// assert_eq!(
+///     p.parse(vec![(0, "21".to_string())].into()),
+///     vec![(42, vec![].into())]
+/// );
+/// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+/// ```
 pub fn apply<T, U, P: Parser<Output = T>>(px: P, f: fn(T) -> U) -> Apply<T, U, P> {
     Apply { px, f }
 }
@@ -167,6 +244,11 @@ mod apply {
             vec![(3, vec![].into())]
         );
         assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
+        let p = apply(int32(), |n| n * 2);
+        assert_eq!(
+            p.parse(vec![(0, "21".to_string())].into()),
+            vec![(42, vec![].into())]
+        );
     }
 }
 
@@ -191,6 +273,19 @@ impl<T: Clone, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> Parser
         result
     }
 }
+/// Applies the given function to the results of the given parsers.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = apply2(literal("foo"), literal("bar"), |s, t| (s.len(), t.len()));
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+///     vec![((3, 3), vec![].into())]
+/// );
+/// assert_eq!(p.parse(vec![(0, "foobar".to_string())].into()), vec![]);
+/// ```
 pub fn apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>>(
     px: P,
     qx: Q,
@@ -236,6 +331,24 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for Alt<T, P, Q> {
         result
     }
 }
+/// Applies the given parsers in order and returns the both results.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = alt(
+///     literal("foo"),
+///     apply2(literal("foo"), literal("bar"), |s, t| s + &t),
+/// );
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+///     vec![
+///         ("foo".to_string(), vec![(1, "bar".to_string())].into()),
+///         ("foobar".to_string(), vec![].into())
+///     ]
+/// );
+/// ```
 pub fn alt<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> Alt<T, P, Q> {
     Alt { px, qx }
 }
@@ -297,6 +410,23 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for AltL<T, P, Q> {
         result
     }
 }
+/// Alternative combinator that returns the result of the first parser if it succeeds.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = altl(
+///     literal("foo"),
+///     apply2(literal("foo"), literal("bar"), |s, t| s + &t),
+/// );
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+///     vec![
+///         ("foo".to_string(), vec![(1, "bar".to_string())].into()),
+///     ]
+/// );
+/// ```
 pub fn altl<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> AltL<T, P, Q> {
     AltL { px, qx }
 }
@@ -354,6 +484,24 @@ impl<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> Parser
         result
     }
 }
+/// Applicative combinator that applies a function to the result of a parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = ap(
+///     literal("hello"),
+///     empty(|x: &String| x.to_string() + "world"),
+/// );
+/// assert_eq!(
+///     p.parse(vec![(0, "hello".to_string()), (1, "foo".to_string())].into()),
+///     vec![(
+///         "helloworld".to_string(),
+///         vec![(1, "foo".to_string())].into()
+///     )]
+/// );
+/// ```
 pub fn ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>>(
     px: P,
     pf: Q,
@@ -399,6 +547,38 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for OneOrMore<T, P> {
         .parse(tokens)
     }
 }
+/// Parser that matches one or more instances of a parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = one_or_more(literal("foo"));
+/// assert_eq!(
+///     p.parse(
+///         vec![
+///             (0, "foo".to_string()),
+///             (1, "foo".to_string()),
+///             (2, "foo".to_string())
+///         ]
+///         .into()
+///     ),
+///     vec![
+///         (
+///             vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+///             vec![].into()
+///         ),
+///         (
+///             vec!["foo".to_string(), "foo".to_string()],
+///             vec![(2, "foo".to_string())].into()
+///         ),
+///         (
+///             vec!["foo".to_string()],
+///             vec![(1, "foo".to_string()), (2, "foo".to_string())].into()
+///         ),
+///     ]
+/// );
+/// ```
 pub fn one_or_more<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> OneOrMore<T, P> {
     OneOrMore { p }
 }
@@ -471,6 +651,39 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for ZeroOrMore<T, P> {
         .parse(tokens)
     }
 }
+/// Parser that matches zero or more instances of a parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = zero_or_more(literal("foo"));
+/// assert_eq!(
+///     p.parse(
+///         vec![
+///             (0, "foo".to_string()),
+///             (1, "foo".to_string()),
+///             (2, "foo".to_string())
+///         ]
+///         .into()
+///     ),
+///     vec![
+///         (
+///             vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+///             vec![].into()
+///         ),
+///         (
+///             vec!["foo".to_string(), "foo".to_string()],
+///             vec![(2, "foo".to_string())].into()
+///         ),
+///         (
+///             vec!["foo".to_string()],
+///             vec![(1, "foo".to_string()), (2, "foo".to_string())].into()
+///         ),
+///         (vec![], vec![(0, "foo".to_string()), (1, "foo".to_string()), (2, "foo".to_string())].into()),
+///     ]
+/// );
+/// ```
 pub fn zero_or_more<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> ZeroOrMore<T, P> {
     ZeroOrMore { p }
 }
@@ -570,6 +783,28 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch1<T, P> {
         .parse(tokens)
     }
 }
+/// Parser that matches one or more instances of a parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = munch1(literal("foo"));
+/// assert_eq!(
+///     p.parse(
+///         vec![
+///             (0, "foo".to_string()),
+///             (1, "foo".to_string()),
+///             (2, "foo".to_string())
+///         ]
+///         .into()
+///     ),
+///     vec![(
+///         vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+///         vec![].into()
+///     )]
+/// );
+/// ```
 pub fn munch1<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> Munch1<T, P> {
     Munch1 { px: p }
 }
@@ -628,6 +863,28 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch<T, P> {
         .parse(tokens)
     }
 }
+/// Parser that matches zero or more instances of a parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = munch(literal("foo"));
+/// assert_eq!(
+///     p.parse(
+///         vec![
+///             (0, "foo".to_string()),
+///             (1, "foo".to_string()),
+///             (2, "foo".to_string())
+///         ]
+///         .into()
+///     ),
+///     vec![(
+///         vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+///         vec![].into()
+///     )]
+/// );
+/// ```
 pub fn munch<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> Munch<T, P> {
     Munch { px: p }
 }
@@ -691,6 +948,18 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for With
         .parse(tokens)
     }
 }
+/// Parser that matches a parser and then another parser, returning the result of the first parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = with(literal("foo"), literal("bar"));
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+///     vec![("foo".to_string(), vec![].into())]
+/// );
+/// ```
 pub fn with<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
     p: P,
     with: Q,
@@ -728,6 +997,18 @@ impl<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone> Parser for Skip
         .parse(tokens)
     }
 }
+/// Parser that matches a parser and then another parser, returning the result of the second parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = skip(literal("foo"), literal("bar"));
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+///     vec![("bar".to_string(), vec![].into())]
+/// );
+/// ```
 pub fn skip<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone>(
     skip: Q,
     p: P,
@@ -776,6 +1057,32 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser
         .parse(tokens)
     }
 }
+/// Parser that matches a parser one or more times, separated by another parser, returning a vector of the results of the first parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = one_or_more_with_sep(literal("foo"), literal(","));
+/// assert_eq!(
+///     p.parse(
+///         vec![
+///             (0, "foo".to_string()),
+///             (1, ",".to_string()),
+///             (2, "foo".to_string()),
+///             (3, ",".to_string()),
+///             (4, "foo".to_string())
+///         ]
+///         .into()
+///     ),
+///     vec![
+///         (
+///             vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+///             vec![].into()
+///         )
+///     ]
+/// );
+/// ```
 pub fn one_or_more_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
     p: P,
     sep: Q,
@@ -881,6 +1188,32 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for Munc
         .parse(tokens)
     }
 }
+/// Parser that matches a parser zero or more times, separated by another parser, returning a vector of the results of the first parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = munch1_with_sep(literal("foo"), literal(","));
+/// assert_eq!(
+///     p.parse(
+///         vec![
+///             (0, "foo".to_string()),
+///             (1, ",".to_string()),
+///             (2, "foo".to_string()),
+///             (3, ",".to_string()),
+///             (4, "foo".to_string())
+///         ]
+///         .into()
+///     ),
+///     vec![
+///         (
+///             vec!["foo".to_string(), "foo".to_string(), "foo".to_string()],
+///             vec![].into()
+///         )
+///     ]
+/// );
+/// ```
 pub fn munch1_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
     p: P,
     sep: Q,
@@ -948,6 +1281,18 @@ impl Parser for Int32 {
         .parse(tokens)
     }
 }
+/// Parser that matches a signed 32-bit integer.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = int32();
+/// assert_eq!(
+///     p.parse(vec![(0, "123".to_string())].into()),
+///     vec![(123, vec![].into())]
+/// );
+/// ```
 pub fn int32() -> Int32 {
     Int32
 }
@@ -966,6 +1311,18 @@ mod int32 {
     }
 }
 
+/// Parser that matches a literal string.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = literal("foo");
+/// assert_eq!(
+///     p.parse(vec![(0, "   ".to_string())].into()),
+///     vec![((), vec![].into())]
+/// );
+/// ```
 pub fn spaces() -> impl Parser<Output = ()> + Clone {
     apply(
         munch1(satisfy(|s| s.chars().all(|c| c.is_whitespace()))),
@@ -989,7 +1346,18 @@ mod spaces {
         assert_eq!(p.parse(vec![(0, "foo".to_string())].into()), vec![]);
     }
 }
-
+/// Parser that matches a literal string.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = literal("foo");
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string())].into()),
+///     vec![("foo".to_string(), vec![].into())]
+/// );
+/// ```
 pub fn string() -> impl Parser<Output = String> + Clone {
     satisfy(|_| true)
 }
@@ -1009,7 +1377,22 @@ mod string {
         );
     }
 }
-
+/// Optional parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = optional(literal("foo"));
+/// assert_eq!(
+///     p.parse(vec![(0, "foo".to_string())].into()),
+///     vec![(Some("foo".to_string()), vec![].into())]
+/// );
+/// assert_eq!(
+///     p.parse(vec![(0, "bar".to_string())].into()),
+///     vec![(None, vec![(0, "bar".to_string())].into())]
+/// );
+/// ```
 pub fn optional<T: Clone, P>(p: P) -> impl Parser<Output = Option<T>> + Clone
 where
     P: Parser<Output = T> + Clone,
@@ -1033,6 +1416,23 @@ mod optional {
     }
 }
 
+/// Bracketed parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = bracket(literal("("), literal("foo"), literal(")"));
+/// assert_eq!(
+///     p.parse(vec![
+///         (0, "(".to_string()),
+///         (1, "foo".to_string()),
+///         (2, ")".to_string())
+///     ]
+///     .into()),
+///     vec![("foo".to_string(), vec![].into())]
+/// );
+/// ```
 pub fn bracket<T: Clone, L, P, R>(l: L, p: P, r: R) -> impl Parser<Output = T> + Clone
 where
     L: Parser + Clone,
@@ -1083,6 +1483,23 @@ mod bracket {
     }
 }
 
+/// Parser that matches a parenthesized expression.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = parens(literal("foo"));
+/// assert_eq!(
+///     p.parse(vec![
+///         (0, "(".to_string()),
+///         (1, "foo".to_string()),
+///         (2, ")".to_string())
+///     ]
+///     .into()),
+///     vec![("foo".to_string(), vec![].into())]
+/// );
+/// ```
 pub fn parens<T: Clone, P>(p: P) -> impl Parser<Output = T> + Clone
 where
     P: Parser<Output = T> + Clone,
