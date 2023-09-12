@@ -411,10 +411,6 @@ fn is_separator(s: String) -> bool {
     .contains(&s)
 }
 
-fn cmd_separator() -> impl Parser<Output = String> + Clone {
-    satisfy(is_separator)
-}
-
 fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
     let symbol = satisfy(|s| !is_separator(s));
     apply2(symbol.clone(), munch(symbol), |cmd, opts| ExternalCmd {
