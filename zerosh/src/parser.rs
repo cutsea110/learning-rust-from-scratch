@@ -512,10 +512,14 @@ fn pipe() -> impl Parser<Output = ()> + Clone {
 #[derive(Debug, PartialEq, Clone)]
 struct Job {
     cmds: Vec<Cmd>,
+    is_bg: bool,
 }
 
 fn job() -> impl Parser<Output = Job> + Clone {
-    apply(munch1_with_sep(command(), pipe()), |cmds| Job { cmds })
+    apply(munch1_with_sep(command(), pipe()), |cmds| Job {
+        cmds,
+        is_bg: false,
+    })
 }
 #[cfg(test)]
 mod job {
@@ -545,7 +549,8 @@ mod job {
                             cmd: "grep".to_string(),
                             opts: vec!["'a'".to_string()],
                         })
-                    ]
+                    ],
+                    is_bg: false,
                 },
                 vec![].into()
             )]
