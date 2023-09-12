@@ -201,10 +201,9 @@ impl Worker {
                                 for job in jobs {
                                     match job {
                                         model::Job::BuiltIn { cmd, is_bg } => {
-                                            if self.built_in_cmd(&cmd, is_bg, &shell_tx) {
-                                                // 組み込みコマンドなら worker_rx から受信
-                                                continue;
-                                            }
+                                            self.built_in_cmd(&cmd, is_bg, &shell_tx);
+                                            // 組み込みコマンドなら worker_rx から受信
+                                            continue;
                                         }
                                         model::Job::External { cmds, is_bg } => {
                                             if !self.spawn_child(&cmds, is_bg) {
@@ -243,19 +242,30 @@ impl Worker {
         cmd: &model::BuiltInCmd,
         is_bg: bool,
         shell_tx: &SyncSender<ShellMsg>,
-    ) -> bool {
+    ) {
         match cmd {
             model::BuiltInCmd::Exit(n) => self.run_exit(&n, shell_tx),
             model::BuiltInCmd::Jobs => self.run_jobs(shell_tx),
             model::BuiltInCmd::Fg(n) => self.run_fg(&n, shell_tx),
             model::BuiltInCmd::Cd(path) => self.run_cd(path),
         };
-        true
     }
 
     /// 終了コマンドを実行
     fn run_exit(&mut self, n: &Option<i32>, shell_tx: &SyncSender<ShellMsg>) -> bool {
-        todo!()
+        // 実行中のジョブがある場合は終了しない
+        if !self.jobs.is_empty() {
+            eprintln!("zerosh: Couldn't quit, there are some running jobs");
+            self.exit_val = 1; // 失敗
+            shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap(); // シェルからの入力を再開
+            return true;
+        }
+
+        // 終了コードを取得
+        let exit_val = n.unwrap_or(self.exit_val);
+
+        shell_tx.send(ShellMsg::Quit(exit_val)).unwrap(); // シェルを終了
+        true
     }
 
     /// ジョブ一覧を表示
