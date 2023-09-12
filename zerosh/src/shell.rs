@@ -197,15 +197,24 @@ impl Worker {
                 match msg {
                     WorkerMsg::Cmd(line) => {
                         match parse_cmd(&line) {
-                            Ok(cmd) => {
-                                if self.built_in_cmd(&cmd, &shell_tx) {
-                                    // 組み込みコマンドなら worker_rx から受信
-                                    continue;
-                                }
-
-                                if !self.spawn_child(&line, &cmd) {
-                                    // 子プロセス生成に失敗した場合、シェルからの入力を再開
-                                    shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
+                            Ok(jobs) => {
+                                for job in jobs {
+                                    match job {
+                                        model::Job::BuiltIn { cmd, is_bg } => {
+                                            if self.built_in_cmd(&cmd, is_bg, &shell_tx) {
+                                                // 組み込みコマンドなら worker_rx から受信
+                                                continue;
+                                            }
+                                        }
+                                        model::Job::External { cmds, is_bg } => {
+                                            if !self.spawn_child(&cmds, is_bg) {
+                                                // 子プロセス生成に失敗した場合、シェルからの入力を再開
+                                                shell_tx
+                                                    .send(ShellMsg::Continue(self.exit_val))
+                                                    .unwrap();
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             Err(e) => {
@@ -229,12 +238,17 @@ impl Worker {
     }
 
     /// 組み込みコマンドの場合は true を返す
-    fn built_in_cmd(&mut self, cmd: &[(&str, Vec<&str>)], shell_tx: &SyncSender<ShellMsg>) -> bool {
+    fn built_in_cmd(
+        &mut self,
+        cmd: &model::BuiltInCmd,
+        is_bg: bool,
+        shell_tx: &SyncSender<ShellMsg>,
+    ) -> bool {
         todo!()
     }
 
     /// 子プロセスを生成。失敗した場合はシェルからの入力を再開する必要がある
-    fn spawn_child(&mut self, line: &str, cmd: &[(&str, Vec<&str>)]) -> bool {
+    fn spawn_child(&mut self, cmd: &[model::ExternalCmd], is_bg: bool) -> bool {
         todo!()
     }
 
@@ -244,9 +258,9 @@ impl Worker {
     }
 }
 
-type CmdResult<'a> = Result<Vec<(&'a str, Vec<&'a str>)>, DynError>;
+type CmdResult<'a> = Result<Vec<model::Job>, DynError>;
 
 /// コマンドをパース
 fn parse_cmd(line: &str) -> CmdResult {
-    todo!()
+    parser::parse(line).map_err(|e| e.into())
 }
