@@ -202,11 +202,11 @@ mod bind {
 }
 
 #[derive(Debug, Clone)]
-pub struct Apply<T, U, P: Parser<Output = T>> {
+pub struct Apply<T, U, P: Parser<Output = T>, F: Fn(T) -> U> {
     px: P,
-    f: fn(T) -> U,
+    f: F,
 }
-impl<T: Clone, U, P: Parser<Output = T>> Parser for Apply<T, U, P> {
+impl<T: Clone, U, P: Parser<Output = T>, F: Fn(T) -> U> Parser for Apply<T, U, P, F> {
     type Output = U;
 
     fn parse(&self, tokens: VecDeque<Token>) -> Vec<(Self::Output, VecDeque<Token>)> {
@@ -230,7 +230,7 @@ impl<T: Clone, U, P: Parser<Output = T>> Parser for Apply<T, U, P> {
 /// );
 /// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
 /// ```
-pub fn apply<T, U, P: Parser<Output = T>>(px: P, f: fn(T) -> U) -> Apply<T, U, P> {
+pub fn apply<T, U, P: Parser<Output = T>, F: Fn(T) -> U>(px: P, f: F) -> Apply<T, U, P, F> {
     Apply { px, f }
 }
 #[cfg(test)]
