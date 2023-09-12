@@ -2,6 +2,22 @@
 //!
 //! # BNF
 //!
+//! # Built-in command
+//!
+//! - [x] exit
+//! - [x] jobs
+//! - [x] fg
+//! - [x] cd
+//!
+//! # Priority of control code
+//!
+//! - [ ] parenthesis "()","{}","``","$()"
+//! - [ ] redirection "<",">",">>"
+//! - [x] pipe "|"
+//! - [ ] logic operator "&&","||"
+//! - [x] background "&"
+//! - [ ] semicolon ";"
+//!
 mod combinator;
 
 use combinator::*;
