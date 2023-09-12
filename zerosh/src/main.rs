@@ -1,4 +1,5 @@
 mod helper;
+mod model;
 mod parser;
 mod shell;
 

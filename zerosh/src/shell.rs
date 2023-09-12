@@ -1,4 +1,5 @@
 use crate::helper::DynError;
+use crate::model;
 use crate::parser;
 use nix::{
     libc,

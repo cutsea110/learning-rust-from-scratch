@@ -20,8 +20,10 @@
 //!
 mod combinator;
 
+use crate::model::*;
 use combinator::*;
 
+/// tokenize command line
 fn tokenize(line: &str) -> Vec<(usize, String)> {
     use std::mem::take;
 
@@ -211,14 +213,7 @@ mod tokenize {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum BuiltInCmd {
-    Exit(Option<i32>),
-    Jobs,
-    Fg(i32),
-    Cd(String),
-}
-
+/// exit command parser
 fn exit_cmd() -> impl Parser<Output = Option<i32>> + Clone {
     skip(literal("exit"), optional(int32()))
 }
@@ -242,7 +237,7 @@ mod exit_cmd {
         );
     }
 }
-
+/// jobs command parser
 fn jobs_cmd() -> impl Parser<Output = String> + Clone {
     literal("jobs")
 }
@@ -266,7 +261,7 @@ mod jobs_cmd {
         );
     }
 }
-
+/// fg command parser
 fn fg_cmd() -> impl Parser<Output = i32> + Clone {
     skip(literal("fg"), int32())
 }
@@ -290,7 +285,7 @@ mod fg_cmd {
         );
     }
 }
-
+/// directory name parser
 fn dir_name() -> impl Parser<Output = String> + Clone {
     satisfy(|s| !s.chars().any(|c| "&|();".contains(c)))
 }
@@ -312,7 +307,7 @@ mod dir_name {
         assert_eq!(dir_name().parse(vec![(0, "|".to_string())].into()), vec![]);
     }
 }
-
+/// cd command parser
 fn cd_cmd() -> impl Parser<Output = String> + Clone {
     skip(literal("cd"), dir_name())
 }
@@ -340,7 +335,7 @@ mod cd_cmd {
         );
     }
 }
-
+/// built-in command parser
 fn built_in_cmd() -> impl Parser<Output = BuiltInCmd> + Clone {
     altl(
         apply(exit_cmd(), BuiltInCmd::Exit),
@@ -411,12 +406,6 @@ mod test {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-struct ExternalCmd {
-    cmd: String,
-    opts: Vec<String>,
-}
-
 fn is_separator(s: String) -> bool {
     vec![
         "&".to_string(),
@@ -427,7 +416,7 @@ fn is_separator(s: String) -> bool {
     ]
     .contains(&s)
 }
-
+/// external command parser
 fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
     let symbol = satisfy(|s| !is_separator(s));
     apply2(symbol.clone(), munch(symbol), |cmd, opts| ExternalCmd {
@@ -471,12 +460,7 @@ mod external_cmd {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Cmd {
-    BuiltIn(BuiltInCmd),
-    External(ExternalCmd),
-}
-
+/// command parser
 fn command() -> impl Parser<Output = Cmd> + Clone {
     altl(
         apply(built_in_cmd(), Cmd::BuiltIn),
@@ -505,17 +489,11 @@ mod command {
         );
     }
 }
-
+/// pipe control simbol parser
 fn pipe() -> impl Parser<Output = ()> + Clone {
     apply(literal("|"), |_| ())
 }
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Job {
-    cmds: Vec<Cmd>,
-    is_bg: bool,
-}
-
+/// job parser
 fn job() -> impl Parser<Output = Job> + Clone {
     bind(munch1_with_sep(command(), pipe()), |cmds| {
         apply(optional(literal("&")), move |bg| Job {
@@ -593,7 +571,7 @@ mod job {
         );
     }
 }
-
+/// command line parser
 fn parse_cmd() -> impl Parser<Output = Vec<Job>> + Clone {
     munch(job())
 }
@@ -667,6 +645,7 @@ impl std::fmt::Display for ParseError {
 }
 impl std::error::Error for ParseError {}
 
+/// parsing
 pub fn parse(line: &str) -> Result<Vec<Job>, ParseError> {
     let tokens = tokenize(line);
     let mut jobs = parse_cmd().parse(tokens.into());
