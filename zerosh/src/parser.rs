@@ -460,47 +460,27 @@ mod external_cmd {
     }
 }
 
-/// command parser
-fn command() -> impl Parser<Output = Cmd> + Clone {
-    altl(
-        apply(built_in_cmd(), Cmd::BuiltIn),
-        apply(external_cmd(), Cmd::External),
-    )
-}
-#[cfg(test)]
-mod command {
-    use super::*;
-
-    #[test]
-    fn test() {
-        assert_eq!(
-            command().parse(vec![(0, "ls".to_string()), (1, "-laF".to_string())].into()),
-            vec![(
-                Cmd::External(ExternalCmd {
-                    cmd: "ls".to_string(),
-                    opts: vec!["-laF".to_string()],
-                }),
-                vec![].into()
-            )]
-        );
-        assert_eq!(
-            command().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
-            vec![(Cmd::BuiltIn(BuiltInCmd::Exit(Some(1))), vec![].into())]
-        );
-    }
-}
 /// pipe control simbol parser
 fn pipe() -> impl Parser<Output = ()> + Clone {
     apply(literal("|"), |_| ())
 }
 /// job parser
 fn job() -> impl Parser<Output = Job> + Clone {
-    bind(munch1_with_sep(command(), pipe()), |cmds| {
-        apply(optional(literal("&")), move |bg| Job {
-            cmds: cmds.clone(),
-            is_bg: bg.is_some(),
-        })
-    })
+    altl(
+        // NOTE: external としてパースされないよう built_in_cmd を先にする
+        bind(built_in_cmd(), |cmd| {
+            apply(optional(literal("&")), move |bg| Job::BuiltIn {
+                cmd: cmd.clone(),
+                is_bg: bg.is_some(),
+            })
+        }),
+        bind(munch1_with_sep(external_cmd(), pipe()), |cmds| {
+            apply(optional(literal("&")), move |bg| Job::External {
+                cmds: cmds.clone(),
+                is_bg: bg.is_some(),
+            })
+        }),
+    )
 }
 #[cfg(test)]
 mod job {
@@ -520,16 +500,16 @@ mod job {
                 .into()
             ),
             vec![(
-                Job {
+                Job::External {
                     cmds: vec![
-                        Cmd::External(ExternalCmd {
+                        ExternalCmd {
                             cmd: "ls".to_string(),
                             opts: vec!["-laF".to_string()],
-                        }),
-                        Cmd::External(ExternalCmd {
+                        },
+                        ExternalCmd {
                             cmd: "grep".to_string(),
                             opts: vec!["'a'".to_string()],
-                        })
+                        }
                     ],
                     is_bg: false,
                 },
@@ -553,16 +533,16 @@ mod job {
                 .into()
             ),
             vec![(
-                Job {
+                Job::External {
                     cmds: vec![
-                        Cmd::External(ExternalCmd {
+                        ExternalCmd {
                             cmd: "ls".to_string(),
                             opts: vec!["-laF".to_string()],
-                        }),
-                        Cmd::External(ExternalCmd {
+                        },
+                        ExternalCmd {
                             cmd: "grep".to_string(),
                             opts: vec!["'a'".to_string()],
-                        })
+                        }
                     ],
                     is_bg: true,
                 },
@@ -600,25 +580,25 @@ mod parse_cmd {
             ),
             vec![(
                 vec![
-                    Job {
+                    Job::External {
                         cmds: vec![
-                            Cmd::External(ExternalCmd {
+                            ExternalCmd {
                                 cmd: "ls".to_string(),
                                 opts: vec!["-laF".to_string()],
-                            }),
-                            Cmd::External(ExternalCmd {
+                            },
+                            ExternalCmd {
                                 cmd: "grep".to_string(),
                                 opts: vec!["'a'".to_string()],
-                            })
+                            }
                         ],
                         is_bg: true,
                     },
-                    Job {
-                        cmds: vec![Cmd::BuiltIn(BuiltInCmd::Cd("~/app".to_string())),],
+                    Job::BuiltIn {
+                        cmd: BuiltInCmd::Cd("~/app".to_string()),
                         is_bg: true,
                     },
-                    Job {
-                        cmds: vec![Cmd::BuiltIn(BuiltInCmd::Exit(Some(1)))],
+                    Job::BuiltIn {
+                        cmd: BuiltInCmd::Exit(Some(1)),
                         is_bg: false,
                     }
                 ],

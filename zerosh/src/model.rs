@@ -13,13 +13,7 @@ pub struct ExternalCmd {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Cmd {
-    BuiltIn(BuiltInCmd),
-    External(ExternalCmd),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Job {
-    pub cmds: Vec<Cmd>,
-    pub is_bg: bool,
+pub enum Job {
+    BuiltIn { cmd: BuiltInCmd, is_bg: bool },
+    External { cmds: Vec<ExternalCmd>, is_bg: bool },
 }
