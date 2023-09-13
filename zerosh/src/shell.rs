@@ -339,7 +339,100 @@ impl Worker {
 
     /// 子プロセスを生成。失敗した場合はシェルからの入力を再開する必要がある
     fn spawn_child(&mut self, cmd: &[model::ExternalCmd], is_bg: bool) -> bool {
+        assert_ne!(cmd.len(), 0);
+
+        // ジョブ ID を取得
+        let job_id = if let Some(id) = self.get_new_job_id() {
+            id
+        } else {
+            eprintln!("zerosh: Couldn't spawn child process, too many jobs already exists");
+            return false;
+        };
+
+        // TODO: 3 つ以上に対応したい
+        if cmd.len() > 2 {
+            eprintln!("zerosh: Pipes with more than 3 commands are not supported yet");
+            return false;
+        }
+
+        let mut input = None; // 2 つ目のプロセスの標準入力
+        let mut output = None; // 1 つ目のプロセスの標準出力
+        if cmd.len() == 2 {
+            // パイプを作成
+            let p = pipe().unwrap();
+            input = Some(p.0);
+            output = Some(p.1);
+        }
+
+        // パイプを閉じる関数を定義
+        let cleanup_pipe = CleanUp {
+            f: || {
+                if let Some(fd) = input {
+                    syscall(|| unistd::close(fd)).unwrap();
+                }
+                if let Some(fd) = output {
+                    syscall(|| unistd::close(fd)).unwrap();
+                }
+            },
+        };
+
+        let pgid;
+        match fork_exec(Pid::from_raw(0), &cmd[0].cmd, &cmd[0].opts, None, output) {
+            Ok(child) => {
+                pgid = child;
+            }
+            Err(e) => {
+                eprintln!("zerosh: Failed to fork: {e}");
+                return false;
+            }
+        }
+
+        // プロセス、ジョブの情報を追加
+        let info = ProcInfo {
+            state: ProcState::Run,
+            pgid,
+        };
+        let mut pids = HashMap::new();
+        pids.insert(pgid, info.clone()); // 1 つ目のプロセスの情報
+
+        // 2 つ目のプロセスを生成
+        if cmd.len() == 2 {
+            match fork_exec(pgid, &cmd[1].cmd, &cmd[1].opts, input, None) {
+                Ok(child) => {
+                    pids.insert(child, info); // 2 つ目のプロセスの情報
+                }
+                Err(e) => {
+                    eprintln!("zerosh: Failed to fork: {e}");
+                    return false;
+                }
+            }
+        }
+
+        // システムコールで生成したパイプは自分で Drop する必要がある
+        // ここでクローズしても子プロセスでは残っている
+        std::mem::drop(cleanup_pipe); // パイプをクローズ
+
+        if !is_bg {
+            // ジョブ情報を追加して子プロセスをフォアグラウンドプロセスグループにする
+            self.fg = Some(pgid);
+            self.insert_job(job_id, pgid, pids, ""); // TODO: line をどうするか
+            tcsetpgrp(libc::STDIN_FILENO, pgid).unwrap();
+        }
+
+        true
+    }
+
+    fn insert_job(&mut self, job_id: usize, pgid: Pid, pids: HashMap<Pid, ProcInfo>, line: &str) {
         todo!()
+    }
+
+    fn get_new_job_id(&self) -> Option<usize> {
+        for i in 0..=usize::MAX {
+            if !self.jobs.contains_key(&i) {
+                return Some(i);
+            }
+        }
+        None
     }
 
     /// 子プロセスの状態変化を管理
@@ -348,9 +441,40 @@ impl Worker {
     }
 }
 
+/// プロセスグループ ID を指定して fork & exec
+/// pgid が 0 の場合は子プロセスのプロセス ID がプロセスグループ ID となる
+///
+/// - input が Some(fd) の場合は、標準入力を fd と設定
+/// - output が Some(fd) の場合は、標準出力を fd と設定
+fn fork_exec(
+    pgid: Pid,
+    filename: &str,
+    args: &[String],
+    input: Option<i32>,
+    output: Option<i32>,
+) -> Result<Pid, DynError> {
+    todo!()
+}
+
 type CmdResult<'a> = Result<Vec<model::Job>, DynError>;
 
 /// コマンドをパース
 fn parse_cmd(line: &str) -> CmdResult {
     parser::parse(line).map_err(Into::into)
+}
+
+/// ドロップ時にクロージャを呼び出す型
+struct CleanUp<F>
+where
+    F: Fn(),
+{
+    f: F,
+}
+impl<F> Drop for CleanUp<F>
+where
+    F: Fn(),
+{
+    fn drop(&mut self) {
+        (self.f)()
+    }
 }
