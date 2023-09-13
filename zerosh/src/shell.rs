@@ -437,6 +437,56 @@ impl Worker {
 
     /// 子プロセスの状態変化を管理
     fn wait_child(&mut self, shell_tx: &SyncSender<ShellMsg>) {
+        // WUNTRACED: 子プロセスの停止
+        // WNOHANG: ブロックしない
+        // WCONTINUED: 実行再開
+        let flag = Some(WaitPidFlag::WUNTRACED | WaitPidFlag::WNOHANG | WaitPidFlag::WCONTINUED);
+
+        loop {
+            match syscall(|| waitpid(Pid::from_raw(-1), flag)) {
+                Ok(WaitStatus::Exited(pid, status)) => {
+                    // プロセスが終了
+                    self.exit_val = status; // 終了コードを保存
+                    self.process_term(pid, shell_tx);
+                }
+                Ok(WaitStatus::Signaled(pid, sig, core)) => {
+                    // プロセスがシグナルにより終了
+                    eprintln!(
+                        "\nzerosh: Child process terminated by signal{}: pid = {pid}, signal = {sig}",
+			if core { " (core dumped)" } else { "" },
+                    );
+                    self.exit_val = sig as i32 + 128; // 終了コードを保存
+                    self.process_term(pid, shell_tx);
+                }
+                // プロセスが停止
+                Ok(WaitStatus::Stopped(pid, sig)) => self.process_stop(pid, shell_tx),
+                Ok(WaitStatus::Continued(pid)) => self.process_continue(pid),
+                Ok(WaitStatus::StillAlive) => return, // wait すべき子プロセスはいない
+                Err(nix::Error::ECHILD) => return,    // 子プロセスはいない
+                Err(e) => {
+                    eprintln!("\nzerosh: Failed to wait: {e}");
+                    exit(1);
+                }
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Ok(WaitStatus::PtraceEvent(pid, _, _) | WaitStatus::PtraceSyscall(pid)) => {
+                    self.process_stop(pid, shell_tx)
+                }
+            }
+        }
+    }
+
+    // プロセスの終了処理
+    fn process_term(&mut self, pid: Pid, shell_tx: &SyncSender<ShellMsg>) {
+        todo!()
+    }
+
+    // プロセスの停止処理
+    fn process_stop(&mut self, pid: Pid, shell_tx: &SyncSender<ShellMsg>) {
+        todo!()
+    }
+
+    // プロセスの再開処理
+    fn process_continue(&mut self, pid: Pid) {
         todo!()
     }
 }
