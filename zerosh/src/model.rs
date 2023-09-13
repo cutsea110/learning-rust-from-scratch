@@ -3,7 +3,7 @@ pub enum BuiltInCmd {
     Exit(Option<i32>),
     Jobs,
     Fg(i32),
-    Cd(String),
+    Cd(Option<String>),
 }
 
 #[derive(Debug, PartialEq, Clone)]

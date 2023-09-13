@@ -308,8 +308,8 @@ mod dir_name {
     }
 }
 /// cd command parser
-fn cd_cmd() -> impl Parser<Output = String> + Clone {
-    skip(literal("cd"), dir_name())
+fn cd_cmd() -> impl Parser<Output = Option<String>> + Clone {
+    skip(literal("cd"), optional(dir_name()))
 }
 #[cfg(test)]
 mod cd_cmd {
@@ -318,20 +318,20 @@ mod cd_cmd {
     #[test]
     fn test() {
         assert_eq!(
-            cd_cmd().parse(vec![(0, "cd".to_string()), (1, "a".to_string())].into()),
-            vec![("a".to_string(), vec![].into())]
+            cd_cmd().parse(vec![(0, "cd".to_string())].into()),
+            vec![(None, vec![].into())]
         );
         assert_eq!(
             cd_cmd().parse(vec![(0, "cd".to_string()), (1, "./a".to_string())].into()),
-            vec![("./a".to_string(), vec![].into())]
+            vec![(Some("./a".to_string()), vec![].into())]
         );
         assert_eq!(
             cd_cmd().parse(vec![(0, "cd".to_string()), (1, "&".to_string())].into()),
-            vec![]
+            vec![(None, vec![(1, "&".to_string())].into())]
         );
         assert_eq!(
             cd_cmd().parse(vec![(0, "cd".to_string()), (1, "|".to_string())].into()),
-            vec![]
+            vec![(None, vec![(1, "|".to_string())].into())]
         );
     }
 }
@@ -372,7 +372,7 @@ mod built_in_cmd {
         );
         assert_eq!(
             built_in_cmd().parse(vec![(0, "cd".to_string()), (1, "~/app".to_string())].into()),
-            vec![(BuiltInCmd::Cd("~/app".to_string()), vec![].into())]
+            vec![(BuiltInCmd::Cd(Some("~/app".to_string())), vec![].into())]
         );
     }
 }
@@ -643,7 +643,7 @@ mod parse_cmd {
                         is_bg: true,
                     },
                     Job::BuiltIn {
-                        cmd: BuiltInCmd::Cd("~/app".to_string()),
+                        cmd: BuiltInCmd::Cd(Some("~/app".to_string())),
                         is_bg: true,
                     },
                     Job::BuiltIn {

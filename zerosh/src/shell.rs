@@ -247,7 +247,7 @@ impl Worker {
             model::BuiltInCmd::Exit(n) => self.run_exit(&n, shell_tx),
             model::BuiltInCmd::Jobs => self.run_jobs(shell_tx),
             model::BuiltInCmd::Fg(n) => self.run_fg(&n, shell_tx),
-            model::BuiltInCmd::Cd(path) => self.run_cd(path),
+            model::BuiltInCmd::Cd(path) => self.run_cd(path, shell_tx),
         };
     }
 
@@ -306,7 +306,7 @@ impl Worker {
     }
 
     /// ディレクトリ移動
-    fn run_cd(&mut self, path: &str) -> bool {
+    fn run_cd(&mut self, path: &Option<String>, shell_tx: &SyncSender<ShellMsg>) -> bool {
         todo!()
     }
 
