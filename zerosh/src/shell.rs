@@ -453,7 +453,46 @@ fn fork_exec(
     input: Option<i32>,
     output: Option<i32>,
 ) -> Result<Pid, DynError> {
-    todo!()
+    let filename = CString::new(filename).unwrap();
+    let args: Vec<CString> = args
+        .into_iter()
+        .map(|s| CString::new(s.to_owned()).unwrap())
+        .collect();
+
+    match syscall(|| unsafe { fork() })? {
+        ForkResult::Parent { child } => {
+            // 子プロセスのプロセスグループ ID を pgid に設定
+            setpgid(child, pgid).unwrap();
+            Ok(child)
+        }
+        ForkResult::Child => {
+            // 子プロセスのプロセスグループ ID を pgid に設定
+            setpgid(Pid::from_raw(0), pgid).unwrap();
+
+            // 標準入出力を設定
+            if let Some(infd) = input {
+                syscall(|| dup2(infd, libc::STDIN_FILENO)).unwrap();
+            }
+            if let Some(outfd) = output {
+                syscall(|| dup2(outfd, libc::STDOUT_FILENO)).unwrap();
+            }
+
+            // signal_hook で利用される Unix ドメインソケットと pipe をクローズ
+            for i in 3..=6 {
+                let _ = syscall(|| unistd::close(i));
+            }
+
+            // 実行ファイルをメモリに読み込み
+            match execvp(&filename, &args) {
+                Err(_) => {
+                    unistd::write(libc::STDERR_FILENO, b"zerosh: execute unknown command\n").ok();
+
+                    exit(1);
+                }
+                Ok(_) => unreachable!(),
+            }
+        }
+    }
 }
 
 type CmdResult<'a> = Result<Vec<model::Job>, DynError>;
