@@ -307,7 +307,24 @@ impl Worker {
 
     /// ディレクトリ移動
     fn run_cd(&mut self, path: &Option<String>, shell_tx: &SyncSender<ShellMsg>) -> bool {
-        todo!()
+        let path = match path {
+            // 引数が指定されていない場合、ホームディレクトリか / に移動
+            None => dirs::home_dir()
+                .or_else(|| Some(PathBuf::from("/")))
+                .unwrap(),
+            Some(path) => PathBuf::from(path),
+        };
+
+        // カレントディレクトリを変更
+        if let Err(e) = std::env::set_current_dir(&path) {
+            self.exit_val = 1; // 失敗
+            eprintln!("failed to change directory to {path:?}: {e}");
+        } else {
+            self.exit_val = 0; // 成功
+        }
+
+        shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap(); // シェルからの入力を再開
+        true
     }
 
     /// プロセスグループのプロセス全部が停止中なら真
