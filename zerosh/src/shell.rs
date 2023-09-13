@@ -270,7 +270,18 @@ impl Worker {
 
     /// ジョブ一覧を表示
     fn run_jobs(&mut self, shell_tx: &SyncSender<ShellMsg>) -> bool {
-        todo!()
+        for (job_id, (pgid, cmd)) in &self.jobs {
+            let state = if self.is_group_stop(*pgid).unwrap() {
+                "Stopped"
+            } else {
+                "Running"
+            };
+            println!("[{job_id}] {state}\t{cmd}");
+        }
+
+        self.exit_val = 0; // 成功
+        shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap(); // シェルからの入力を再開
+        true
     }
 
     /// フォアグラウンド実行
@@ -297,6 +308,16 @@ impl Worker {
     /// ディレクトリ移動
     fn run_cd(&mut self, path: &str) -> bool {
         todo!()
+    }
+
+    /// プロセスグループのプロセス全部が停止中なら真
+    fn is_group_stop(&self, pgid: Pid) -> Option<bool> {
+        for pid in self.pgid_to_pids.get(&pgid)?.1.iter() {
+            if self.pid_to_info.get(pid).unwrap().state == ProcState::Run {
+                return Some(false);
+            }
+        }
+        Some(true)
     }
 
     /// 子プロセスを生成。失敗した場合はシェルからの入力を再開する必要がある
