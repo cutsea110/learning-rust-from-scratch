@@ -412,8 +412,34 @@ impl Worker {
         true
     }
 
+    /// ジョブの管理
+    /// 引数には変化のあったジョブとプロセスグループを指定
+    ///
+    /// - フォアグラウンドプロセスが空の場合、シェルをフォアグラウンドに設定
+    /// - フォアグラウンドプロセスがすべて停止中の場合、シェルをフォアグラウンドに設定
     fn manage_job(&mut self, job_id: usize, pgid: Pid, shell_tx: &SyncSender<ShellMsg>) {
-        todo!()
+        let is_fg = self.fg.map_or(false, |x| pgid == x); // フォアグラウンドのプロセスか?
+        let line = &self.jobs.get(&job_id).unwrap().1;
+        if is_fg {
+            // 状態が変化したプロセスはフォアグラウンドに設定
+            if self.is_group_empty(pgid) {
+                // フォアグラウンドプロセスが空の場合、
+                // ジョブ情報を削除してシェルをフォアグラウンドに設定
+                eprintln!("[{job_id}] Done\t{line}");
+                self.remove_job(job_id);
+                self.set_shell_fg(shell_tx);
+            } else if self.is_group_stop(pgid).unwrap() {
+                // フォアグラウンドプロセスがすべて停止中の場合、シェルをフォアグラウンドに設定
+                eprintln!("\n[{job_id}Stopped\t{line}");
+                self.set_shell_fg(shell_tx);
+            }
+        } else {
+            // プロセスグループが空の場合、ジョブ情報を削除
+            if self.is_group_empty(pgid) {
+                eprintln!("\n[{job_id}] Done\t{line}");
+                self.remove_job(job_id);
+            }
+        }
     }
 
     fn insert_job(&mut self, job_id: usize, pgid: Pid, pids: HashMap<Pid, ProcInfo>, line: &str) {
