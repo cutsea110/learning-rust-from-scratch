@@ -443,6 +443,11 @@ impl Worker {
         let flag = Some(WaitPidFlag::WUNTRACED | WaitPidFlag::WNOHANG | WaitPidFlag::WCONTINUED);
 
         loop {
+            // pid = -1 指定によりすべての子プロセスの状態変化を待つ
+            // waitpid は終了したプロセスのリソース開放も行う
+            // これを忘れるとゾンビプロセスになり無駄にリソースを消費する
+            // WNOHANG を指定しているので、子プロセスの状態に変化がない場合は即座に返る
+            // これにより worker はシグナルとコマンドライン実行の両方を並行に処理できる
             match syscall(|| waitpid(Pid::from_raw(-1), flag)) {
                 Ok(WaitStatus::Exited(pid, status)) => {
                     // プロセスが終了
