@@ -367,6 +367,7 @@ impl Worker {
         };
 
         let pgid;
+        // 1 つ目のプロセスを生成
         match fork_exec(Pid::from_raw(0), &cmd[0].cmd, &cmd[0].opts, None, output) {
             Ok(child) => {
                 pgid = child;
