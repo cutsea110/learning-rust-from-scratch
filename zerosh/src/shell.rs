@@ -425,7 +425,7 @@ impl Worker {
             if self.is_group_empty(pgid) {
                 // フォアグラウンドプロセスが空の場合、
                 // ジョブ情報を削除してシェルをフォアグラウンドに設定
-                eprintln!("[{job_id}] Done\t{line}");
+                eprintln!("\n[{job_id}] Done\t{line}");
                 self.remove_job(job_id);
                 self.set_shell_fg(shell_tx);
             } else if self.is_group_stop(pgid).unwrap() {
@@ -443,7 +443,19 @@ impl Worker {
     }
 
     fn insert_job(&mut self, job_id: usize, pgid: Pid, pids: HashMap<Pid, ProcInfo>, line: &str) {
-        todo!()
+        assert!(!self.jobs.contains_key(&job_id));
+        self.jobs.insert(job_id, (pgid, line.to_string())); // ジョブ情報を追加
+
+        let mut procs = HashSet::new(); // pgid_to_pids へ追加するプロセス
+        for (pid, info) in pids {
+            procs.insert(pid);
+
+            assert!(!self.pid_to_info.contains_key(&pid));
+            self.pid_to_info.insert(pid, info); // プロセス情報を追加
+        }
+
+        assert!(!self.pgid_to_pids.contains_key(&pgid));
+        self.pgid_to_pids.insert(pgid, (job_id, procs)); // プロセスグループ情報を追加
     }
 
     fn set_pid_state(&mut self, pid: Pid, state: ProcState) -> Option<ProcState> {
