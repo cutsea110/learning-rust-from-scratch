@@ -327,16 +327,6 @@ impl Worker {
         true
     }
 
-    /// プロセスグループのプロセス全部が停止中なら真
-    fn is_group_stop(&self, pgid: Pid) -> Option<bool> {
-        for pid in self.pgid_to_pids.get(&pgid)?.1.iter() {
-            if self.pid_to_info.get(pid).unwrap().state == ProcState::Run {
-                return Some(false);
-            }
-        }
-        Some(true)
-    }
-
     /// 子プロセスを生成。失敗した場合はシェルからの入力を再開する必要がある
     fn spawn_child(&mut self, cmd: &[model::ExternalCmd], is_bg: bool) -> bool {
         assert_ne!(cmd.len(), 0);
@@ -422,7 +412,41 @@ impl Worker {
         true
     }
 
+    fn manage_job(&mut self, job_id: usize, pgid: Pid, shell_tx: &SyncSender<ShellMsg>) {
+        todo!()
+    }
+
     fn insert_job(&mut self, job_id: usize, pgid: Pid, pids: HashMap<Pid, ProcInfo>, line: &str) {
+        todo!()
+    }
+
+    fn set_pid_state(&mut self, pid: Pid, state: ProcState) -> Option<ProcState> {
+        todo!()
+    }
+
+    fn remove_pid(&mut self, pid: Pid) -> Option<(usize, Pid)> {
+        todo!()
+    }
+
+    fn remove_job(&mut self, job_id: usize) {
+        todo!()
+    }
+
+    fn is_group_empty(&self, pgid: Pid) -> bool {
+        todo!()
+    }
+
+    /// プロセスグループのプロセス全部が停止中なら真
+    fn is_group_stop(&self, pgid: Pid) -> Option<bool> {
+        for pid in self.pgid_to_pids.get(&pgid)?.1.iter() {
+            if self.pid_to_info.get(pid).unwrap().state == ProcState::Run {
+                return Some(false);
+            }
+        }
+        Some(true)
+    }
+
+    fn set_shell_fg(&mut self, shell_tx: &SyncSender<ShellMsg>) {
         todo!()
     }
 
@@ -482,17 +506,23 @@ impl Worker {
 
     // プロセスの終了処理
     fn process_term(&mut self, pid: Pid, shell_tx: &SyncSender<ShellMsg>) {
-        todo!()
+        // プロセス ID を削除し、必要ならフォアグラウンドプロセスをシェルに設定
+        if let Some((job_id, pgid)) = self.remove_pid(pid) {
+            self.manage_job(job_id, pgid, shell_tx);
+        }
     }
 
     // プロセスの停止処理
     fn process_stop(&mut self, pid: Pid, shell_tx: &SyncSender<ShellMsg>) {
-        todo!()
+        self.set_pid_state(pid, ProcState::Stop); // プロセスを停止中に設定
+        let pgid = self.pid_to_info.get(&pid).unwrap().pgid; // プロセスグループ ID を取得
+        let job_id = self.pgid_to_pids.get(&pgid).unwrap().0; // ジョブ ID を取得
+        self.manage_job(job_id, pgid, shell_tx); // 必要ならフォアグラウンドプロセスをシェルに設定
     }
 
     // プロセスの再開処理
     fn process_continue(&mut self, pid: Pid) {
-        todo!()
+        self.set_pid_state(pid, ProcState::Run); // プロセスを実行中に設定
     }
 }
 
