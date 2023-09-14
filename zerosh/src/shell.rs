@@ -598,10 +598,11 @@ fn fork_exec(
     output: Option<i32>,
 ) -> Result<Pid, DynError> {
     let filename = CString::new(filename).unwrap();
-    let args: Vec<CString> = args
+    let mut args: Vec<CString> = args
         .into_iter()
         .map(|s| CString::new(s.to_owned()).unwrap())
         .collect();
+    args.insert(0, filename.clone());
 
     match syscall(|| unsafe { fork() })? {
         ForkResult::Parent { child } => {
