@@ -370,7 +370,7 @@ impl Worker {
         // 1 つ目のプロセスを生成
         match fork_exec(
             Pid::from_raw(0),
-            &cmd[0].args[0],
+            &cmd[0].filename(),
             &cmd[0].args,
             None,
             output,
@@ -394,7 +394,7 @@ impl Worker {
 
         // 2 つ目のプロセスを生成
         if cmd.len() == 2 {
-            match fork_exec(pgid, &cmd[1].args[0], &cmd[1].args, input, None) {
+            match fork_exec(pgid, &cmd[1].filename(), &cmd[1].args, input, None) {
                 Ok(child) => {
                     pids.insert(child, info); // 2 つ目のプロセスの情報
                 }

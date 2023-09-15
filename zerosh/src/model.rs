@@ -10,6 +10,12 @@ pub enum BuiltInCmd {
 pub struct ExternalCmd {
     pub args: Vec<String>,
 }
+impl ExternalCmd {
+    pub fn filename(&self) -> &str {
+        assert_ne!(self.args.len(), 0);
+        &self.args[0]
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Job {
