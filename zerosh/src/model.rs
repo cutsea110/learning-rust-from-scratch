@@ -8,8 +8,7 @@ pub enum BuiltInCmd {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ExternalCmd {
-    pub cmd: String,
-    pub opts: Vec<String>,
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -419,10 +419,7 @@ fn is_separator(s: String) -> bool {
 /// external command parser
 fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
     let symbol = satisfy(|s| !is_separator(s));
-    apply2(symbol.clone(), munch(symbol), |cmd, opts| ExternalCmd {
-        cmd,
-        opts,
-    })
+    apply(munch1(symbol), |args| ExternalCmd { args })
 }
 #[cfg(test)]
 mod external_cmd {
@@ -434,8 +431,7 @@ mod external_cmd {
             external_cmd().parse(vec![(0, "ls".to_string()), (1, "-laF".to_string())].into()),
             vec![(
                 ExternalCmd {
-                    cmd: "ls".to_string(),
-                    opts: vec!["-laF".to_string()],
+                    args: vec!["ls".to_string(), "-laF".to_string()],
                 },
                 vec![].into()
             )]
@@ -451,8 +447,7 @@ mod external_cmd {
             ),
             vec![(
                 ExternalCmd {
-                    cmd: "ls".to_string(),
-                    opts: vec!["-laF".to_string()],
+                    args: vec!["ls".to_string(), "-laF".to_string()],
                 },
                 vec![(2, "|".to_string())].into()
             )]
@@ -503,12 +498,10 @@ mod job {
                 Job::External {
                     cmds: vec![
                         ExternalCmd {
-                            cmd: "ls".to_string(),
-                            opts: vec!["-laF".to_string()],
+                            args: vec!["ls".to_string(), "-laF".to_string()],
                         },
                         ExternalCmd {
-                            cmd: "grep".to_string(),
-                            opts: vec!["'a'".to_string()],
+                            args: vec!["grep".to_string(), "'a'".to_string()],
                         }
                     ],
                     is_bg: false,
@@ -560,12 +553,10 @@ mod job {
                 Job::External {
                     cmds: vec![
                         ExternalCmd {
-                            cmd: "ls".to_string(),
-                            opts: vec!["-laF".to_string()],
+                            args: vec!["ls".to_string(), "-laF".to_string()],
                         },
                         ExternalCmd {
-                            cmd: "grep".to_string(),
-                            opts: vec!["'a'".to_string()],
+                            args: vec!["grep".to_string(), "'a'".to_string()],
                         }
                     ],
                     is_bg: true,
@@ -632,12 +623,10 @@ mod parse_cmd {
                     Job::External {
                         cmds: vec![
                             ExternalCmd {
-                                cmd: "ls".to_string(),
-                                opts: vec!["-laF".to_string()],
+                                args: vec!["ls".to_string(), "-laF".to_string()],
                             },
                             ExternalCmd {
-                                cmd: "grep".to_string(),
-                                opts: vec!["'a'".to_string()],
+                                args: vec!["grep".to_string(), "'a'".to_string()],
                             }
                         ],
                         is_bg: true,

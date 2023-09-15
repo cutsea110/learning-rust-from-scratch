@@ -368,7 +368,13 @@ impl Worker {
 
         let pgid;
         // 1 つ目のプロセスを生成
-        match fork_exec(Pid::from_raw(0), &cmd[0].cmd, &cmd[0].opts, None, output) {
+        match fork_exec(
+            Pid::from_raw(0),
+            &cmd[0].args[0],
+            &cmd[0].args,
+            None,
+            output,
+        ) {
             Ok(child) => {
                 pgid = child;
             }
@@ -388,7 +394,7 @@ impl Worker {
 
         // 2 つ目のプロセスを生成
         if cmd.len() == 2 {
-            match fork_exec(pgid, &cmd[1].cmd, &cmd[1].opts, input, None) {
+            match fork_exec(pgid, &cmd[1].args[0], &cmd[1].args, input, None) {
                 Ok(child) => {
                     pids.insert(child, info); // 2 つ目のプロセスの情報
                 }
