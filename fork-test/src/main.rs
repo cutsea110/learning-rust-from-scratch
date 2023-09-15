@@ -42,7 +42,7 @@ fn dopipes(cmds: Vec<&Vec<&str>>) {
                 })
                 .unwrap();
 
-                dopipes(cmds[1..].to_vec());
+                dopipes(cmds[0..cmds.len() - 1].to_vec());
             }
             ForkResult::Parent { .. } => {
                 // 親プロセスならパイプを stdin に dup2 して
@@ -54,8 +54,9 @@ fn dopipes(cmds: Vec<&Vec<&str>>) {
                 })
                 .unwrap();
 
-                let filename = CString::new(cmds[0][0]).unwrap();
-                let args = cmds[0]
+                let i = cmds.len() - 1;
+                let filename = CString::new(cmds[i][0]).unwrap();
+                let args = cmds[i]
                     .iter()
                     .map(|s| CString::new(*s).unwrap())
                     .collect::<Vec<_>>();
@@ -69,13 +70,12 @@ fn main() {
     let cmd1 = vec!["cat", "src/main.rs"];
     let cmd2 = vec!["head", "-n80"];
     let cmd3 = vec!["grep", "let"];
-    let mut cmds = vec![&cmd1, &cmd2, &cmd3];
+    let cmds = vec![&cmd1, &cmd2, &cmd3];
 
     let pid = syscall(|| unsafe { fork() }).unwrap();
     match pid {
         ForkResult::Child => {
             println!("child");
-            cmds.reverse();
             dopipes(cmds);
         }
         ForkResult::Parent { child } => {
