@@ -15,6 +15,14 @@ impl ExternalCmd {
         assert_ne!(self.args.len(), 0);
         &self.args[0]
     }
+
+    pub fn cmd_line(&self) -> String {
+        self.args[0..]
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>()
+            .join(" ")
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
