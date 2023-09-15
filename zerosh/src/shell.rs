@@ -604,8 +604,10 @@ fn fork_exec(
     output: Option<i32>,
 ) -> Result<Pid, DynError> {
     let filename = CString::new(filename).unwrap();
-    let mut cmd_args = vec![filename.clone()];
-    cmd_args.extend(args.iter().map(|s| CString::new(s.as_str()).unwrap()));
+    let args: Vec<CString> = args
+        .iter()
+        .map(|s| CString::new(s.as_str()).unwrap())
+        .collect();
 
     match syscall(|| unsafe { fork() })? {
         ForkResult::Parent { child } => {
@@ -631,7 +633,7 @@ fn fork_exec(
             }
 
             // 実行ファイルをメモリに読み込み
-            match execvp(&filename, &cmd_args) {
+            match execvp(&filename, &args) {
                 Err(_) => {
                     unistd::write(libc::STDERR_FILENO, b"zerosh: execute unknown command\n").ok();
 
