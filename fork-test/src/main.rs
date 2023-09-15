@@ -80,10 +80,6 @@ fn main() {
         }
         ForkResult::Parent { child } => {
             println!("parent: child={}", child);
-
-            let flag =
-                Some(WaitPidFlag::WUNTRACED | WaitPidFlag::WNOHANG | WaitPidFlag::WCONTINUED);
-            let _ = syscall(|| waitpid(Pid::from_raw(-1), flag));
         }
     }
 }
