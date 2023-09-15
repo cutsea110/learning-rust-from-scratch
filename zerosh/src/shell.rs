@@ -8,8 +8,7 @@ use nix::{
         wait::{waitpid, WaitPidFlag, WaitStatus},
     },
     unistd::{
-        self, dup2, execvp, fork, getpgid, getpid, pipe, setpgid, tcgetpgrp, tcsetpgrp, ForkResult,
-        Pid,
+        self, execvp, fork, getpgid, getpid, pipe, setpgid, tcgetpgrp, tcsetpgrp, ForkResult, Pid,
     },
 };
 use rustyline::{error::ReadlineError, Editor};
