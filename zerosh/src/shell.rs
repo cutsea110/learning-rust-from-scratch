@@ -7,10 +7,14 @@ use nix::{
         signal::{killpg, signal, SigHandler, Signal},
         wait::{waitpid, WaitPidFlag, WaitStatus},
     },
-    unistd::{self, dup2, execvp, fork, pipe, setpgid, tcgetpgrp, tcsetpgrp, ForkResult, Pid},
+    unistd::{
+        self, dup2, execvp, fork, getpgid, getpid, pipe, setpgid, tcgetpgrp, tcsetpgrp, ForkResult,
+        Pid,
+    },
 };
 use rustyline::{error::ReadlineError, Editor};
 use signal_hook::{consts::*, iterator::Signals};
+use std::collections::VecDeque;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ffi::CString,
@@ -339,18 +343,10 @@ impl Worker {
             return false;
         };
 
-        // TODO: 3 つ以上に対応したい
-        if cmd.len() > 2 {
-            eprintln!("zerosh: Pipes with more than 3 commands are not supported yet");
-            return false;
-        }
-
-        let p = pipe().unwrap();
-
         let pgid;
-        let n = if cmd.len() == 1 { -1 } else { 0 };
-        // 1 つ目のプロセスを生成
-        match fork_exec(Pid::from_raw(0), &cmd[0].filename(), &cmd[0].args, p, n) {
+        let mut pids = HashMap::new();
+        // ジョブを処理するベースとなるプロセスを生成
+        match fork_exec(Pid::from_raw(0), &cmd, &mut pids) {
             Ok(child) => {
                 pgid = child;
             }
@@ -359,30 +355,6 @@ impl Worker {
                 return false;
             }
         }
-
-        // プロセス、ジョブの情報を追加
-        let info = ProcInfo {
-            state: ProcState::Run,
-            pgid,
-        };
-        let mut pids = HashMap::new();
-        pids.insert(pgid, info.clone()); // 1 つ目のプロセスの情報
-
-        // 2 つ目のプロセスを生成
-        if cmd.len() == 2 {
-            match fork_exec(pgid, &cmd[1].filename(), &cmd[1].args, p, 1) {
-                Ok(child) => {
-                    pids.insert(child, info); // 2 つ目のプロセスの情報
-                }
-                Err(e) => {
-                    eprintln!("zerosh: Failed to fork: {e}");
-                    return false;
-                }
-            }
-        }
-
-        unistd::close(p.0).unwrap();
-        unistd::close(p.1).unwrap();
 
         if !is_bg {
             // ジョブ情報を追加して子プロセスをフォアグラウンドプロセスグループにする
@@ -571,6 +543,65 @@ impl Worker {
     }
 }
 
+fn dopipes(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, ProcInfo>) {
+    let cmd = cmds.pop_back().unwrap();
+    let filename = CString::new(cmd.filename()).unwrap();
+    let args = cmd
+        .args
+        .iter()
+        .map(|s| CString::new(s.as_str()).unwrap())
+        .collect::<Vec<_>>();
+
+    if cmds.is_empty() {
+        match execvp(&filename, &args) {
+            Err(e) => {
+                eprintln!("zerosh: Failed to exec: {e}");
+                exit(1);
+            }
+            Ok(_) => unreachable!(),
+        }
+    } else {
+        let p = pipe().unwrap();
+        match syscall(|| unsafe { fork() }).unwrap() {
+            ForkResult::Child => {
+                // 子プロセスならパイプを stdout に dup2 して再帰
+                syscall(|| {
+                    unistd::close(p.0).unwrap();
+                    unistd::dup2(p.1, libc::STDOUT_FILENO).unwrap();
+                    unistd::close(p.1)
+                })
+                .unwrap();
+
+                dopipes(cmds, pids);
+            }
+            ForkResult::Parent { child } => {
+                // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
+                syscall(|| {
+                    unistd::close(p.1).unwrap();
+                    unistd::dup2(p.0, libc::STDIN_FILENO).unwrap();
+                    unistd::close(p.0)
+                })
+                .unwrap();
+
+                pids.insert(
+                    child,
+                    ProcInfo {
+                        state: ProcState::Run,
+                        pgid: getpgid(None).unwrap(),
+                    },
+                );
+                match execvp(&filename, &args) {
+                    Err(e) => {
+                        eprintln!("zerosh: Failed to exec: {e}");
+                        exit(1);
+                    }
+                    Ok(_) => unreachable!(),
+                }
+            }
+        }
+    }
+}
+
 /// プロセスグループ ID を指定して fork & exec
 /// pgid が 0 の場合は子プロセスのプロセス ID がプロセスグループ ID となる
 ///
@@ -578,66 +609,30 @@ impl Worker {
 /// - output が Some(fd) の場合は、標準出力を fd と設定
 fn fork_exec(
     pgid: Pid,
-    filename: &str,
-    args: &[String],
-    p: (i32, i32),
-    n: i32,
+    cmds: &[model::ExternalCmd],
+    pids: &mut HashMap<Pid, ProcInfo>,
 ) -> Result<Pid, DynError> {
-    let filename = CString::new(filename).unwrap();
-    let args: Vec<CString> = args
-        .iter()
-        .map(|s| CString::new(s.as_str()).unwrap())
-        .collect();
-
     match syscall(|| unsafe { fork() })? {
         ForkResult::Parent { child } => {
             // 子プロセスのプロセスグループ ID を pgid に設定
             setpgid(child, pgid).unwrap();
+            pids.insert(
+                child,
+                ProcInfo {
+                    state: ProcState::Run,
+                    pgid: child,
+                },
+            );
+
             Ok(child)
         }
         ForkResult::Child => {
             // 子プロセスのプロセスグループ ID を pgid に設定
             setpgid(Pid::from_raw(0), pgid).unwrap();
 
-            if n == -1 {
-                // 1つだけだった場合はパイプは使わない
-                syscall(|| {
-                    unistd::close(p.0).unwrap();
-                    unistd::close(p.1)
-                })
-                .unwrap();
-            } else if n == 0 {
-                // out は dup2
-                syscall(|| {
-                    unistd::close(p.0).unwrap();
-                    dup2(p.1, libc::STDOUT_FILENO).unwrap();
-                    unistd::close(p.1)
-                })
-                .unwrap();
-            } else if n == 1 {
-                // in は dup2
-                syscall(|| {
-                    unistd::close(p.1).unwrap();
-                    dup2(p.0, libc::STDIN_FILENO).unwrap();
-                    unistd::close(p.0)
-                })
-                .unwrap();
-            }
+            dopipes(&mut VecDeque::from(cmds.to_vec()), pids);
 
-            // signal_hook で利用される Unix ドメインソケットと pipe をクローズ
-            for i in 3..=6 {
-                let _ = syscall(|| unistd::close(i));
-            }
-
-            // 実行ファイルをメモリに読み込み
-            match execvp(&filename, &args) {
-                Err(_) => {
-                    unistd::write(libc::STDERR_FILENO, b"zerosh: execute unknown command\n").ok();
-
-                    exit(1);
-                }
-                Ok(_) => unreachable!(),
-            }
+            Ok(getpid())
         }
     }
 }
