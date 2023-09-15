@@ -345,36 +345,12 @@ impl Worker {
             return false;
         }
 
-        let mut input = None; // 2 つ目のプロセスの標準入力
-        let mut output = None; // 1 つ目のプロセスの標準出力
-        if cmd.len() == 2 {
-            // パイプを作成
-            let p = pipe().unwrap();
-            input = Some(p.0);
-            output = Some(p.1);
-        }
-
-        // パイプを閉じる関数を定義
-        let cleanup_pipe = CleanUp {
-            f: || {
-                if let Some(fd) = input {
-                    syscall(|| unistd::close(fd)).unwrap();
-                }
-                if let Some(fd) = output {
-                    syscall(|| unistd::close(fd)).unwrap();
-                }
-            },
-        };
+        let p = pipe().unwrap();
 
         let pgid;
+        let n = if cmd.len() == 1 { -1 } else { 0 };
         // 1 つ目のプロセスを生成
-        match fork_exec(
-            Pid::from_raw(0),
-            &cmd[0].filename(),
-            &cmd[0].args,
-            None,
-            output,
-        ) {
+        match fork_exec(Pid::from_raw(0), &cmd[0].filename(), &cmd[0].args, p, n) {
             Ok(child) => {
                 pgid = child;
             }
@@ -394,7 +370,7 @@ impl Worker {
 
         // 2 つ目のプロセスを生成
         if cmd.len() == 2 {
-            match fork_exec(pgid, &cmd[1].filename(), &cmd[1].args, input, None) {
+            match fork_exec(pgid, &cmd[1].filename(), &cmd[1].args, p, 1) {
                 Ok(child) => {
                     pids.insert(child, info); // 2 つ目のプロセスの情報
                 }
@@ -405,9 +381,8 @@ impl Worker {
             }
         }
 
-        // システムコールで生成したパイプは自分で Drop する必要がある
-        // ここでクローズしても子プロセスでは残っている
-        std::mem::drop(cleanup_pipe); // パイプをクローズ
+        unistd::close(p.0).unwrap();
+        unistd::close(p.1).unwrap();
 
         if !is_bg {
             // ジョブ情報を追加して子プロセスをフォアグラウンドプロセスグループにする
@@ -605,8 +580,8 @@ fn fork_exec(
     pgid: Pid,
     filename: &str,
     args: &[String],
-    input: Option<i32>,
-    output: Option<i32>,
+    p: (i32, i32),
+    n: i32,
 ) -> Result<Pid, DynError> {
     let filename = CString::new(filename).unwrap();
     let args: Vec<CString> = args
@@ -624,12 +599,29 @@ fn fork_exec(
             // 子プロセスのプロセスグループ ID を pgid に設定
             setpgid(Pid::from_raw(0), pgid).unwrap();
 
-            // 標準入出力を設定
-            if let Some(infd) = input {
-                syscall(|| dup2(infd, libc::STDIN_FILENO)).unwrap();
-            }
-            if let Some(outfd) = output {
-                syscall(|| dup2(outfd, libc::STDOUT_FILENO)).unwrap();
+            if n == -1 {
+                // 1つだけだった場合はパイプは使わない
+                syscall(|| {
+                    unistd::close(p.0).unwrap();
+                    unistd::close(p.1)
+                })
+                .unwrap();
+            } else if n == 0 {
+                // out は dup2
+                syscall(|| {
+                    unistd::close(p.0).unwrap();
+                    dup2(p.1, libc::STDOUT_FILENO).unwrap();
+                    unistd::close(p.1)
+                })
+                .unwrap();
+            } else if n == 1 {
+                // in は dup2
+                syscall(|| {
+                    unistd::close(p.1).unwrap();
+                    dup2(p.0, libc::STDIN_FILENO).unwrap();
+                    unistd::close(p.0)
+                })
+                .unwrap();
             }
 
             // signal_hook で利用される Unix ドメインソケットと pipe をクローズ
