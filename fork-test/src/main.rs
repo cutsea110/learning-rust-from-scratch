@@ -21,7 +21,7 @@ where
 
 fn dopipes(cmds: Vec<&Vec<&str>>) {
     if cmds.len() == 1 {
-        // 最後なら端に execvp
+        // 最後なら単に execvp
         let filename = CString::new(cmds[0][0]).unwrap();
         let args = cmds[0]
             .iter()
@@ -29,7 +29,7 @@ fn dopipes(cmds: Vec<&Vec<&str>>) {
             .collect::<Vec<_>>();
         execvp(&filename, &args).unwrap();
     } else {
-        // 端以外ならパイプを作って両端を再帰的に実行
+        // 端以外ならパイプを作って再帰的に実行
         let p = pipe().unwrap();
         let pid = syscall(|| unsafe { fork() }).unwrap();
         match pid {
