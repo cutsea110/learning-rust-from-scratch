@@ -555,9 +555,7 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
         .collect::<Vec<_>>();
 
     if cmds.is_empty() {
-        // 構文的にはパイプよりリダイレクトの方が結合度が高く、差し込めるが
-        // その場合 stdout をどうするか意味論が良く分かってないので、
-        // とりあえず最後のコマンドだけリダイレクトを実装する
+        // TODO: 下のブランチでも全く同じコードを書いているのでリファクタしたい
         if let Some(model::Redirection::Stdout(ref out)) = cmd.redirect {
             let fd = syscall(move || {
                 nix::fcntl::open(
@@ -574,6 +572,7 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
             })
             .unwrap();
         }
+
         match execvp(&filename, &args) {
             Err(e) => {
                 eprintln!("{NAME}: Failed to exec: {e}");
@@ -596,6 +595,24 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
                 do_pipeline(cmds, pids);
             }
             ForkResult::Parent { child } => {
+                // TODO: 上のブランチでも全く同じコードを書いているのでリファクタしたい
+                if let Some(model::Redirection::Stdout(ref out)) = cmd.redirect {
+                    let fd = syscall(move || {
+                        nix::fcntl::open(
+                            out.as_str(),
+                            nix::fcntl::OFlag::O_WRONLY | nix::fcntl::OFlag::O_CREAT,
+                            nix::sys::stat::Mode::S_IRWXU,
+                        )
+                    })
+                    .unwrap();
+                    syscall(|| {
+                        close(libc::STDOUT_FILENO).unwrap();
+                        dup2(fd, libc::STDOUT_FILENO).unwrap();
+                        close(fd)
+                    })
+                    .unwrap();
+                }
+
                 // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
                 syscall(|| {
                     close(p.1).unwrap();
