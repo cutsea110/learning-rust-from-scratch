@@ -545,7 +545,7 @@ impl Worker {
     }
 }
 
-fn dopipes(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, ProcInfo>) {
+fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, ProcInfo>) {
     let cmd = cmds.pop_back().unwrap();
     let filename = CString::new(cmd.filename()).unwrap();
     let args = cmd
@@ -574,7 +574,7 @@ fn dopipes(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, Proc
                 })
                 .unwrap();
 
-                dopipes(cmds, pids);
+                do_pipeline(cmds, pids);
             }
             ForkResult::Parent { child } => {
                 // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
@@ -632,7 +632,7 @@ fn fork_exec(
             // 子プロセスのプロセスグループ ID を pgid に設定
             setpgid(Pid::from_raw(0), pgid).unwrap();
 
-            dopipes(&mut VecDeque::from(cmds.to_vec()), pids);
+            do_pipeline(&mut VecDeque::from(cmds.to_vec()), pids);
 
             Ok(getpid())
         }
