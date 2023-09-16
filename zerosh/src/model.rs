@@ -7,8 +7,18 @@ pub enum BuiltInCmd {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Redirection {
+    Stdout(String),
+    Append(String),
+    Stdin(String),
+    Stderr(String),
+    HereDoc(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct ExternalCmd {
     pub args: Vec<String>,
+    pub redirect: Option<Redirection>,
 }
 impl ExternalCmd {
     pub fn filename(&self) -> &str {

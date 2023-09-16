@@ -441,7 +441,10 @@ mod symbol {
 
 /// external command parser
 fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
-    apply(munch1(symbol()), |args| ExternalCmd { args })
+    apply(munch1(symbol()), |args| ExternalCmd {
+        args,
+        redirect: None,
+    })
 }
 #[cfg(test)]
 mod external_cmd {
@@ -454,6 +457,7 @@ mod external_cmd {
             vec![(
                 ExternalCmd {
                     args: vec!["ls".to_string(), "-laF".to_string()],
+                    redirect: None,
                 },
                 vec![].into()
             )]
@@ -470,6 +474,7 @@ mod external_cmd {
             vec![(
                 ExternalCmd {
                     args: vec!["ls".to_string(), "-laF".to_string()],
+                    redirect: None,
                 },
                 vec![(2, "|".to_string())].into()
             )]
@@ -521,9 +526,11 @@ mod job {
                     cmds: vec![
                         ExternalCmd {
                             args: vec!["ls".to_string(), "-laF".to_string()],
+                            redirect: None,
                         },
                         ExternalCmd {
                             args: vec!["grep".to_string(), "'a'".to_string()],
+                            redirect: None,
                         }
                     ],
                     is_bg: false,
@@ -576,9 +583,11 @@ mod job {
                     cmds: vec![
                         ExternalCmd {
                             args: vec!["ls".to_string(), "-laF".to_string()],
+                            redirect: None,
                         },
                         ExternalCmd {
                             args: vec!["grep".to_string(), "'a'".to_string()],
+                            redirect: None,
                         }
                     ],
                     is_bg: true,
@@ -646,9 +655,11 @@ mod parse_cmd {
                         cmds: vec![
                             ExternalCmd {
                                 args: vec!["ls".to_string(), "-laF".to_string()],
+                                redirect: None,
                             },
                             ExternalCmd {
                                 args: vec!["grep".to_string(), "'a'".to_string()],
+                                redirect: None,
                             }
                         ],
                         is_bg: true,
