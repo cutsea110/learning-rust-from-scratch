@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 dirs = "4.0.0"
-rustyline = "10.0"
+rustyline = "10.1"
 nix = "0.25"
-signal-hook = "0.3.14"
+signal-hook = "0.3.17"
 
 [profile.release]
 panic = "abort"
