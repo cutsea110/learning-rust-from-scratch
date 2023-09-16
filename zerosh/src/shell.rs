@@ -24,6 +24,8 @@ use std::{
     thread,
 };
 
+const NAME: &str = "zerosh";
+
 /// システムコール呼び出しのラッパ。 EINTR ならリトライ。
 fn syscall<F, T>(f: F) -> Result<T, nix::Error>
 where
@@ -67,7 +69,7 @@ impl Shell {
 
         let mut rl = Editor::<()>::new()?;
         if let Err(e) = rl.load_history(&self.logfile) {
-            eprintln!("zerosh: failed to load history: {e}");
+            eprintln!("{NAME}: failed to load history: {e}");
         }
 
         // チャネルを生成して signal_handler と worker スレッドを生成
@@ -81,7 +83,7 @@ impl Shell {
         loop {
             // 1 行読み込んで、その行を worker スレッドに送信
             let face = if prev == 0 { '\u{1F642}' } else { '\u{1F480}' };
-            match rl.readline(&format!("zerosh {face} > ")) {
+            match rl.readline(&format!("{NAME} {face} > ")) {
                 Ok(line) => {
                     let line_trimed = line.trim(); // 行頭と行末の空白を削除
                     if line_trimed.is_empty() {
@@ -103,7 +105,7 @@ impl Shell {
                 }
                 // コマンド読み込み時に割り込みが発生した場合は再実行する
                 // これは主に Ctrl-C が入力された場合に発生し、誤ってシェルが終了しないようにする
-                Err(ReadlineError::Interrupted) => eprintln!("zerosh: press Ctrl-D to exit"),
+                Err(ReadlineError::Interrupted) => eprintln!("{NAME}: press Ctrl-D to exit"),
                 // Ctrl-D が入力された場合はシェルを終了する
                 Err(ReadlineError::Eof) => {
                     worker_tx.send(WorkerMsg::Cmd("exit".to_string())).unwrap();
@@ -120,7 +122,7 @@ impl Shell {
                 }
                 // なんらかの理由で読み込みに失敗した場合もシェルを終了する
                 Err(e) => {
-                    eprintln!("zerosh: readline error\n{e}");
+                    eprintln!("{NAME}: readline error\n{e}");
                     exit_val = 1;
                     break;
                 }
@@ -128,7 +130,7 @@ impl Shell {
         }
 
         if let Err(e) = rl.save_history(&self.logfile) {
-            eprintln!("zerosh: failed to save history: {e}");
+            eprintln!("{NAME}: failed to save history: {e}");
         }
         exit(exit_val);
     }
@@ -220,7 +222,7 @@ impl Worker {
                                 }
                             }
                             Err(e) => {
-                                eprintln!("zerosh: {e}");
+                                eprintln!("{NAME}: {e}");
                                 // コマンドのパースに失敗した場合はシェルからの入力を再開するため
                                 // main スレッドに通知する
                                 shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
@@ -258,7 +260,7 @@ impl Worker {
     fn run_exit(&mut self, n: &Option<i32>, shell_tx: &SyncSender<ShellMsg>) -> bool {
         // 実行中のジョブがある場合は終了しない
         if !self.jobs.is_empty() {
-            eprintln!("zerosh: Couldn't quit, there are some running jobs");
+            eprintln!("{NAME}: Couldn't quit, there are some running jobs");
             self.exit_val = 1; // 失敗
             shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap(); // シェルからの入力を再開
             return true;
@@ -338,7 +340,7 @@ impl Worker {
         let job_id = if let Some(id) = self.get_new_job_id() {
             id
         } else {
-            eprintln!("zerosh: Couldn't spawn child process, too many jobs already exists");
+            eprintln!("{NAME}: Couldn't spawn child process, too many jobs already exists");
             return false;
         };
 
@@ -350,7 +352,7 @@ impl Worker {
                 pgid = child;
             }
             Err(e) => {
-                eprintln!("zerosh: Failed to fork: {e}");
+                eprintln!("{NAME}: Failed to fork: {e}");
                 return false;
             }
         }
@@ -497,7 +499,7 @@ impl Worker {
                 Ok(WaitStatus::Signaled(pid, sig, core)) => {
                     // プロセスがシグナルにより終了
                     eprintln!(
-                        "\nzerosh: Child process terminated by signal{}: pid = {pid}, signal = {sig}",
+                        "\n{NAME}: Child process terminated by signal{}: pid = {pid}, signal = {sig}",
 			if core { " (core dumped)" } else { "" },
                     );
                     self.exit_val = sig as i32 + 128; // 終了コードを保存
@@ -509,7 +511,7 @@ impl Worker {
                 Ok(WaitStatus::StillAlive) => return, // wait すべき子プロセスはいない
                 Err(nix::Error::ECHILD) => return,    // 子プロセスはいない
                 Err(e) => {
-                    eprintln!("\nzerosh: Failed to wait: {e}");
+                    eprintln!("\n{NAME}: Failed to wait: {e}");
                     exit(1);
                 }
                 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -554,7 +556,7 @@ fn dopipes(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, Proc
     if cmds.is_empty() {
         match execvp(&filename, &args) {
             Err(e) => {
-                eprintln!("zerosh: Failed to exec: {e}");
+                eprintln!("{NAME}: Failed to exec: {e}");
                 exit(1);
             }
             Ok(_) => unreachable!(),
@@ -591,7 +593,7 @@ fn dopipes(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, Proc
                 );
                 match execvp(&filename, &args) {
                     Err(e) => {
-                        eprintln!("zerosh: Failed to exec: {e}");
+                        eprintln!("{NAME}: Failed to exec: {e}");
                         exit(1);
                     }
                     Ok(_) => unreachable!(),
