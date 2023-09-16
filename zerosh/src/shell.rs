@@ -555,7 +555,25 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
         .collect::<Vec<_>>();
 
     if cmds.is_empty() {
-        // TODO: redirect 処理
+        // 構文的にはパイプよりリダイレクトの方が結合度が高く、差し込めるが
+        // その場合 stdout をどうするか意味論が良く分かってないので、
+        // とりあえず最後のコマンドだけリダイレクトを実装する
+        if let Some(model::Redirection::Stdout(ref out)) = cmd.redirect {
+            let fd = syscall(move || {
+                nix::fcntl::open(
+                    out.as_str(),
+                    nix::fcntl::OFlag::O_WRONLY | nix::fcntl::OFlag::O_CREAT,
+                    nix::sys::stat::Mode::S_IRWXU,
+                )
+            })
+            .unwrap();
+            syscall(|| {
+                close(libc::STDOUT_FILENO).unwrap();
+                dup2(fd, libc::STDOUT_FILENO).unwrap();
+                close(fd)
+            })
+            .unwrap();
+        }
         match execvp(&filename, &args) {
             Err(e) => {
                 eprintln!("{NAME}: Failed to exec: {e}");
@@ -593,7 +611,6 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
                         pgid: getpgid(None).unwrap(),
                     },
                 );
-                // TODO: redirect 処理
                 match execvp(&filename, &args) {
                     Err(e) => {
                         eprintln!("{NAME}: Failed to exec: {e}");
