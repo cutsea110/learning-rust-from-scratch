@@ -554,8 +554,8 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
         .map(|s| CString::new(s.as_str()).unwrap())
         .collect::<Vec<_>>();
 
-    if cmds.is_empty() {
-        // TODO: 下のブランチでも全く同じコードを書いているのでリファクタしたい
+    // TODO: Stdout 以外のリダイレクトにも対応する
+    let handle_redirect = || {
         if let Some(model::Redirection::Stdout(ref out)) = cmd.redirect {
             let fd = syscall(move || {
                 nix::fcntl::open(
@@ -572,6 +572,11 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
             })
             .unwrap();
         }
+    };
+
+    if cmds.is_empty() {
+        // リダイレクト処理
+        handle_redirect();
 
         match execvp(&filename, &args) {
             Err(e) => {
@@ -595,23 +600,8 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
                 do_pipeline(cmds, pids);
             }
             ForkResult::Parent { child } => {
-                // TODO: 上のブランチでも全く同じコードを書いているのでリファクタしたい
-                if let Some(model::Redirection::Stdout(ref out)) = cmd.redirect {
-                    let fd = syscall(move || {
-                        nix::fcntl::open(
-                            out.as_str(),
-                            nix::fcntl::OFlag::O_WRONLY | nix::fcntl::OFlag::O_CREAT,
-                            nix::sys::stat::Mode::S_IRWXU,
-                        )
-                    })
-                    .unwrap();
-                    syscall(|| {
-                        close(libc::STDOUT_FILENO).unwrap();
-                        dup2(fd, libc::STDOUT_FILENO).unwrap();
-                        close(fd)
-                    })
-                    .unwrap();
-                }
+                // リダイレクト処理
+                handle_redirect();
 
                 // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
                 syscall(|| {
