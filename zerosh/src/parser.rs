@@ -416,10 +416,32 @@ fn is_separator(s: String) -> bool {
     ]
     .contains(&s)
 }
+/// symbol parser
+fn symbol() -> impl Parser<Output = String> + Clone {
+    satisfy(|s| !is_separator(s))
+}
+#[cfg(test)]
+mod symbol {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            symbol().parse(vec![(0, "ls".to_string())].into()),
+            vec![("ls".to_string(), vec![].into())]
+        );
+        assert_eq!(
+            symbol().parse(vec![(0, "ls".to_string()), (1, "-laF".to_string())].into()),
+            vec![("ls".to_string(), vec![(1, "-laF".to_string())].into())]
+        );
+        assert_eq!(symbol().parse(vec![(0, "&".to_string())].into()), vec![]);
+        assert_eq!(symbol().parse(vec![(0, "|".to_string())].into()), vec![]);
+    }
+}
+
 /// external command parser
 fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
-    let symbol = satisfy(|s| !is_separator(s));
-    apply(munch1(symbol), |args| ExternalCmd { args })
+    apply(munch1(symbol()), |args| ExternalCmd { args })
 }
 #[cfg(test)]
 mod external_cmd {
