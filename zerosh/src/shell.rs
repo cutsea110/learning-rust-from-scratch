@@ -8,7 +8,8 @@ use nix::{
         wait::{waitpid, WaitPidFlag, WaitStatus},
     },
     unistd::{
-        self, execvp, fork, getpgid, getpid, pipe, setpgid, tcgetpgrp, tcsetpgrp, ForkResult, Pid,
+        close, dup2, execvp, fork, getpgid, getpid, pipe, setpgid, tcgetpgrp, tcsetpgrp,
+        ForkResult, Pid,
     },
 };
 use rustyline::{error::ReadlineError, Editor};
@@ -567,9 +568,9 @@ fn dopipes(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, Proc
             ForkResult::Child => {
                 // 子プロセスならパイプを stdout に dup2 して再帰
                 syscall(|| {
-                    unistd::close(p.0).unwrap();
-                    unistd::dup2(p.1, libc::STDOUT_FILENO).unwrap();
-                    unistd::close(p.1)
+                    close(p.0).unwrap();
+                    dup2(p.1, libc::STDOUT_FILENO).unwrap();
+                    close(p.1)
                 })
                 .unwrap();
 
@@ -578,9 +579,9 @@ fn dopipes(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, Proc
             ForkResult::Parent { child } => {
                 // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
                 syscall(|| {
-                    unistd::close(p.1).unwrap();
-                    unistd::dup2(p.0, libc::STDIN_FILENO).unwrap();
-                    unistd::close(p.0)
+                    close(p.1).unwrap();
+                    dup2(p.0, libc::STDIN_FILENO).unwrap();
+                    close(p.0)
                 })
                 .unwrap();
 
