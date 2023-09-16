@@ -555,6 +555,7 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
         .collect::<Vec<_>>();
 
     if cmds.is_empty() {
+        // TODO: redirect 処理
         match execvp(&filename, &args) {
             Err(e) => {
                 eprintln!("{NAME}: Failed to exec: {e}");
@@ -592,6 +593,7 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
                         pgid: getpgid(None).unwrap(),
                     },
                 );
+                // TODO: redirect 処理
                 match execvp(&filename, &args) {
                     Err(e) => {
                         eprintln!("{NAME}: Failed to exec: {e}");

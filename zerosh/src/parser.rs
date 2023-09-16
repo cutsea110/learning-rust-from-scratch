@@ -97,7 +97,7 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
                 result.push((len - chars.clone().count() - 1, "&".to_string()));
             }
             // これらは 1 文字トークン
-            '|' | '(' | ')' | ';' => {
+            '|' | '(' | ')' | ';' | '<' | '>' => {
                 if token.len() > 0 {
                     result.push((
                         len - chars.clone().count() - token.len() - 1,
@@ -287,7 +287,7 @@ mod fg_cmd {
 }
 /// directory name parser
 fn dir_name() -> impl Parser<Output = String> + Clone {
-    satisfy(|s| !s.chars().any(|c| "&|();".contains(c)))
+    satisfy(|s| !s.chars().any(|c| "&|();<>".contains(c)))
 }
 #[cfg(test)]
 mod dir_name {
@@ -413,6 +413,8 @@ fn is_separator(s: String) -> bool {
         "(".to_string(),
         ")".to_string(),
         ";".to_string(),
+        "<".to_string(),
+        ">".to_string(),
     ]
     .contains(&s)
 }
@@ -439,11 +441,17 @@ mod symbol {
     }
 }
 
+fn redirect() -> impl Parser<Output = Redirection> + Clone {
+    apply(skip(literal(">"), symbol()), |s| Redirection::Stdout(s))
+}
+
 /// external command parser
 fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
-    apply(munch1(symbol()), |args| ExternalCmd {
-        args,
-        redirect: None,
+    bind(munch1(symbol()), |args| {
+        apply(optional(redirect()), move |out| ExternalCmd {
+            args: args.clone(),
+            redirect: out,
+        })
     })
 }
 #[cfg(test)]
@@ -477,6 +485,24 @@ mod external_cmd {
                     redirect: None,
                 },
                 vec![(2, "|".to_string())].into()
+            )]
+        );
+        assert_eq!(
+            external_cmd().parse(
+                vec![
+                    (0, "ls".to_string()),
+                    (1, "-laF".to_string()),
+                    (2, ">".to_string()),
+                    (3, "a.log".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                ExternalCmd {
+                    args: vec!["ls".to_string(), "-laF".to_string()],
+                    redirect: Some(Redirection::Stdout("a.log".to_string())),
+                },
+                vec![].into()
             )]
         );
     }
