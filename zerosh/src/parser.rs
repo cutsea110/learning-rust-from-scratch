@@ -77,7 +77,7 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
                     }
                 }
             }
-            // & もしくは && の場合
+            // "&", "&&" の場合
             c if c == '&' => {
                 if token.len() > 0 {
                     result.push((
@@ -89,7 +89,27 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
                 if let Some(&next_c) = chars.peek() {
                     if next_c == c {
                         chars.next();
-                        let cc = String::from_utf8(vec![c as u8, c as u8]).unwrap();
+                        let cc = String::from_utf8(vec![c as u8, next_c as u8]).unwrap();
+                        result.push((len - chars.clone().count() - 2, cc));
+                        continue;
+                    }
+                }
+
+                result.push((len - chars.clone().count() - 1, c.to_string()));
+            }
+            // "|", "||", "|&" の場合
+            c if c == '|' => {
+                if token.len() > 0 {
+                    result.push((
+                        len - chars.clone().count() - token.len() - 1,
+                        take(&mut token),
+                    ));
+                }
+
+                if let Some(&next_c) = chars.peek() {
+                    if next_c == c || next_c == '&' {
+                        chars.next();
+                        let cc = String::from_utf8(vec![c as u8, next_c as u8]).unwrap();
                         result.push((len - chars.clone().count() - 2, cc));
                         continue;
                     }
@@ -98,7 +118,7 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
                 result.push((len - chars.clone().count() - 1, c.to_string()));
             }
             // これらは 1 文字トークン
-            '|' | '(' | ')' | ';' | '<' | '>' => {
+            '(' | ')' | ';' | '<' | '>' => {
                 if token.len() > 0 {
                     result.push((
                         len - chars.clone().count() - token.len() - 1,
@@ -124,6 +144,9 @@ mod tokenize {
         assert_eq!(tokenize("foo"), vec![(0, "foo".to_string())]);
         assert_eq!(tokenize(" foo"), vec![(1, "foo".to_string())]);
         assert_eq!(tokenize("\tfoo"), vec![(1, "foo".to_string())]);
+        assert_eq!(tokenize("foo\0"), vec![(0, "foo\0".to_string())]);
+        assert_eq!(tokenize("foo\t"), vec![(0, "foo".to_string())]);
+        assert_eq!(tokenize("foo\n"), vec![(0, "foo".to_string())]);
         assert_eq!(
             tokenize("foo bar buz"),
             vec![
@@ -132,6 +155,7 @@ mod tokenize {
                 (8, "buz".to_string())
             ]
         );
+
         assert_eq!(
             tokenize("echo \"hello, world\""),
             vec![(0, "echo".to_string()), (5, "\"hello, world\"".to_string())]
@@ -140,14 +164,204 @@ mod tokenize {
             tokenize("echo 'hello, world'"),
             vec![(0, "echo".to_string()), (5, "'hello, world'".to_string())]
         );
+
         assert_eq!(
-            tokenize("echo test&"),
+            tokenize("foo&"),
+            vec![(0, "foo".to_string()), (3, "&".to_string()),]
+        );
+        assert_eq!(
+            tokenize("foo & bar"),
             vec![
-                (0, "echo".to_string()),
-                (5, "test".to_string()),
-                (9, "&".to_string())
+                (0, "foo".to_string()),
+                (4, "&".to_string()),
+                (6, "bar".to_string())
             ]
         );
+        assert_eq!(
+            tokenize("foo& bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "&".to_string()),
+                (5, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo &bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "&".to_string()),
+                (5, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo&bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "&".to_string()),
+                (4, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo && bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "&&".to_string()),
+                (7, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo&& bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "&&".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo &&bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "&&".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo&&bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "&&".to_string()),
+                (5, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo & & bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "&".to_string()),
+                (6, "&".to_string()),
+                (8, "bar".to_string())
+            ]
+        );
+
+        assert_eq!(
+            tokenize("foo|"),
+            vec![(0, "foo".to_string()), (3, "|".to_string()),]
+        );
+        assert_eq!(
+            tokenize("foo | bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "|".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo| bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "|".to_string()),
+                (5, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo |bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "|".to_string()),
+                (5, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo|bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "|".to_string()),
+                (4, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo || bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "||".to_string()),
+                (7, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo|| bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "||".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo ||bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "||".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo||bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "||".to_string()),
+                (5, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo | | bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "|".to_string()),
+                (6, "|".to_string()),
+                (8, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo |& bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "|&".to_string()),
+                (7, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo|& bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "|&".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo |&bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "|&".to_string()),
+                (6, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo|&bar"),
+            vec![
+                (0, "foo".to_string()),
+                (3, "|&".to_string()),
+                (5, "bar".to_string())
+            ]
+        );
+        assert_eq!(
+            tokenize("foo | & bar"),
+            vec![
+                (0, "foo".to_string()),
+                (4, "|".to_string()),
+                (6, "&".to_string()),
+                (8, "bar".to_string())
+            ]
+        );
+
         assert_eq!(
             tokenize("echo \"test\'s\"|grep test"),
             vec![
@@ -169,48 +383,18 @@ mod tokenize {
             ]
         );
         assert_eq!(
-            tokenize("cd ./home | (make build; make test)"),
-            vec![
-                (0, "cd".to_string()),
-                (3, "./home".to_string()),
-                (10, "|".to_string()),
-                (12, "(".to_string()),
-                (13, "make".to_string()),
-                (18, "build".to_string()),
-                (23, ";".to_string()),
-                (25, "make".to_string()),
-                (30, "test".to_string()),
-                (34, ")".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo && bar"),
+            tokenize("foo ./a | (bar; buz)"),
             vec![
                 (0, "foo".to_string()),
-                (4, "&&".to_string()),
-                (7, "bar".to_string())
+                (4, "./a".to_string()),
+                (8, "|".to_string()),
+                (10, "(".to_string()),
+                (11, "bar".to_string()),
+                (14, ";".to_string()),
+                (16, "buz".to_string()),
+                (19, ")".to_string())
             ]
         );
-        assert_eq!(
-            tokenize("foo & & bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "&".to_string()),
-                (6, "&".to_string()),
-                (8, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo & bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "&".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(tokenize("foo\0"), vec![(0, "foo\0".to_string())]);
-        assert_eq!(tokenize("foo\t"), vec![(0, "foo".to_string())]);
-        assert_eq!(tokenize("foo\n"), vec![(0, "foo".to_string())]);
     }
 }
 
