@@ -78,7 +78,7 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
                 }
             }
             // & もしくは && の場合
-            '&' => {
+            c if c == '&' => {
                 if token.len() > 0 {
                     result.push((
                         len - chars.clone().count() - token.len() - 1,
@@ -86,15 +86,16 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
                     ));
                 }
 
-                if let Some(&c) = chars.peek() {
-                    if c == '&' {
+                if let Some(&next_c) = chars.peek() {
+                    if next_c == c {
                         chars.next();
-                        result.push((len - chars.clone().count() - 2, "&&".to_string()));
+                        let cc = String::from_utf8(vec![c as u8, c as u8]).unwrap();
+                        result.push((len - chars.clone().count() - 2, cc));
                         continue;
                     }
                 }
 
-                result.push((len - chars.clone().count() - 1, "&".to_string()));
+                result.push((len - chars.clone().count() - 1, c.to_string()));
             }
             // これらは 1 文字トークン
             '|' | '(' | ')' | ';' | '<' | '>' => {
