@@ -35,7 +35,7 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
     while let Some(c) = chars.next() {
         match c {
             // 空白読み飛ばし
-            ' ' | '\t' => {
+            c if c.is_whitespace() => {
                 if token.len() > 0 {
                     result.push((
                         len - chars.clone().count() - token.len() - 1,
@@ -209,7 +209,7 @@ mod tokenize {
         );
         assert_eq!(tokenize("foo\0"), vec![(0, "foo\0".to_string())]);
         assert_eq!(tokenize("foo\t"), vec![(0, "foo".to_string())]);
-        assert_eq!(tokenize("foo\n"), vec![(0, "foo\n".to_string())]);
+        assert_eq!(tokenize("foo\n"), vec![(0, "foo".to_string())]);
     }
 }
 
