@@ -556,7 +556,7 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
 
     // TODO: Stdout 以外のリダイレクトにも対応する
     let handle_redirect = || {
-        if let Some(model::Redirection::Stdout(ref out)) = cmd.redirect {
+        if let Some(model::Redirection::StdOut(ref out)) = cmd.redirect {
             let fd = syscall(move || {
                 nix::fcntl::open(
                     out.as_str(),

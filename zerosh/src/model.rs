@@ -8,11 +8,12 @@ pub enum BuiltInCmd {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Redirection {
-    Stdout(String),
-    Append(String),
-    Stdin(String),
-    Stderr(String),
-    HereDoc(String),
+    StdOut(String), // > file
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Pipe {
+    StdOut, // |
 }
 
 #[derive(Debug, PartialEq, Clone)]

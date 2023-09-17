@@ -20,7 +20,7 @@
 //!
 mod combinator;
 
-use crate::model::*;
+use crate::model::{self, *};
 use combinator::*;
 
 /// tokenize command line
@@ -627,7 +627,7 @@ mod symbol {
 }
 
 fn redirect() -> impl Parser<Output = Redirection> + Clone {
-    apply(skip(literal(">"), symbol()), |s| Redirection::Stdout(s))
+    apply(skip(literal(">"), symbol()), |s| Redirection::StdOut(s))
 }
 
 /// external command parser
@@ -685,7 +685,7 @@ mod external_cmd {
             vec![(
                 ExternalCmd {
                     args: vec!["ls".to_string(), "-laF".to_string()],
-                    redirect: Some(Redirection::Stdout("a.log".to_string())),
+                    redirect: Some(Redirection::StdOut("a.log".to_string())),
                 },
                 vec![].into()
             )]
@@ -694,8 +694,8 @@ mod external_cmd {
 }
 
 /// pipe control simbol parser
-fn pipe() -> impl Parser<Output = ()> + Clone {
-    apply(literal("|"), |_| ())
+fn pipe() -> impl Parser<Output = Pipe> + Clone {
+    apply(literal("|"), |_| Pipe::StdOut)
 }
 /// job parser
 fn job() -> impl Parser<Output = Job> + Clone {
