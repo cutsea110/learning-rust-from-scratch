@@ -539,7 +539,6 @@ impl Worker {
 }
 
 fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
-    // TODO: Stdout 以外のリダイレクトにも対応する
     fn handle_redirect(cmd: &model::ExternalCmd) {
         match cmd.redirect {
             Some(model::Redirection::StdOut(ref out)) => {
