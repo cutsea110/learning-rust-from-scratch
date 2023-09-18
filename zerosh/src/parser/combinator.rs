@@ -1416,6 +1416,48 @@ mod optional {
     }
 }
 
+/// Tuple parser.
+///
+/// # Examples
+///
+/// ```
+/// use parser_combinators::*;
+/// let p = tuple(literal("foo"), literal("bar"));
+/// assert_eq!(
+///     p.parse(vec![
+///         (0, "foo".to_string()),
+///         (1, "bar".to_string())
+///     ]
+///     .into()),
+///     vec![(("foo".to_string(), "bar".to_string()), vec![].into())]
+/// );
+/// ```
+pub fn tuple<T: Clone, U: Clone, P, Q>(p: P, q: Q) -> impl Parser<Output = (T, U)> + Clone
+where
+    P: Parser<Output = T> + Clone,
+    Q: Parser<Output = U> + Clone,
+{
+    bind(p, move |x| apply(q.clone(), move |y| (x.clone(), y)))
+}
+#[cfg(test)]
+mod tuple {
+    #[test]
+    fn test() {
+        use super::*;
+        let p = tuple(literal("foo"), literal("bar"));
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "bar".to_string())].into()),
+            vec![(("foo".to_string(), "bar".to_string()), vec![].into())]
+        );
+        assert_eq!(p.parse(vec![(0, "foo".to_string())].into()), vec![]);
+        let p = tuple(literal("foo"), int32());
+        assert_eq!(
+            p.parse(vec![(0, "foo".to_string()), (1, "42".to_string())].into()),
+            vec![(("foo".to_string(), 42), vec![].into())]
+        );
+    }
+}
+
 /// Bracketed parser.
 ///
 /// # Examples

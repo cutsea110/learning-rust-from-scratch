@@ -695,8 +695,13 @@ mod external_cmd {
 
 /// pipe control simbol parser
 fn pipe() -> impl Parser<Output = Pipe> + Clone {
-    apply(literal("|"), |_| Pipe::StdOut)
+    apply(altl(literal("|"), literal("|&")), |p| match p.as_str() {
+        "|" => Pipe::StdOut,
+        "|&" => Pipe::Both,
+        _ => unreachable!(),
+    })
 }
+
 /// job parser
 fn job() -> impl Parser<Output = Job> + Clone {
     altl(

@@ -14,6 +14,14 @@ pub enum Redirection {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Pipe {
     StdOut, // |
+    Both,   // |&
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Pipeline {
+    Src(ExternalCmd),
+    Out(Box<Pipeline>, ExternalCmd),
+    Both(Box<Pipeline>, ExternalCmd),
 }
 
 #[derive(Debug, PartialEq, Clone)]
