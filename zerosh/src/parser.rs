@@ -636,6 +636,22 @@ fn redirect() -> impl Parser<Output = Redirection> + Clone {
         })
     })
 }
+#[cfg(test)]
+mod redirect {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            redirect().parse(vec![(0, ">".to_string()), (1, "a.txt".to_string())].into()),
+            vec![(Redirection::StdOut("a.txt".to_string()), vec![].into())]
+        );
+        assert_eq!(
+            redirect().parse(vec![(0, ">&".to_string()), (1, "a.txt".to_string())].into()),
+            vec![(Redirection::Both("a.txt".to_string()), vec![].into())]
+        );
+    }
+}
 
 /// external command parser
 fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
