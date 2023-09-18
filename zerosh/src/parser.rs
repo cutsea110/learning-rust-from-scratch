@@ -702,6 +702,24 @@ fn pipe() -> impl Parser<Output = Pipe> + Clone {
     })
 }
 
+/// pipeline parser
+fn pipeline() -> impl Parser<Output = Pipeline> + Clone {
+    let src = external_cmd();
+    let tpl = tuple(pipe(), external_cmd());
+    bind(src, move |cmd| {
+        apply(munch(tpl.clone()), move |cmds| {
+            let mut acc = Pipeline::Src(cmd.clone());
+            for (p, cmd) in cmds {
+                match &p {
+                    Pipe::StdOut => acc = Pipeline::Out(Box::new(acc), cmd),
+                    Pipe::Both => acc = Pipeline::Both(Box::new(acc), cmd),
+                }
+            }
+            acc
+        })
+    })
+}
+
 /// job parser
 fn job() -> impl Parser<Output = Job> + Clone {
     altl(
