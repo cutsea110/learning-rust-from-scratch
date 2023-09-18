@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 dirs = "4.0.0"
-rustyline = "10.1"
+env_logger = "0.10.0"
+log = "0.4.20"
 nix = "0.25"
+rustyline = "10.1"
 signal-hook = "0.3.17"
 
 [profile.release]

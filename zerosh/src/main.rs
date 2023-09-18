@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 mod helper;
 mod model;
 mod parser;
@@ -8,6 +11,8 @@ use helper::DynError;
 const HISTORY_FILE: &str = ".zerosh_history";
 
 fn main() -> Result<(), DynError> {
+    env_logger::init();
+
     let mut logfile = HISTORY_FILE;
     let mut home = dirs::home_dir();
     if let Some(h) = &mut home {
