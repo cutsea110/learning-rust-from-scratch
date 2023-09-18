@@ -759,19 +759,3 @@ type CmdResult<'a> = Result<Vec<model::Job>, DynError>;
 fn parse_cmd(line: &str) -> CmdResult {
     parser::parse(line).map_err(Into::into)
 }
-
-/// ドロップ時にクロージャを呼び出す型
-struct CleanUp<F>
-where
-    F: Fn(),
-{
-    f: F,
-}
-impl<F> Drop for CleanUp<F>
-where
-    F: Fn(),
-{
-    fn drop(&mut self) {
-        (self.f)()
-    }
-}
