@@ -628,7 +628,13 @@ mod symbol {
 }
 
 fn redirect() -> impl Parser<Output = Redirection> + Clone {
-    apply(skip(literal(">"), symbol()), |s| Redirection::StdOut(s))
+    bind(altl(literal(">"), literal(">&")), |r| {
+        apply(symbol(), move |file| match r.as_str() {
+            ">" => Redirection::StdOut(file),
+            ">&" => Redirection::Both(file),
+            _ => unreachable!(),
+        })
+    })
 }
 
 /// external command parser
@@ -857,16 +863,16 @@ mod job {
             ),
             vec![(
                 Job::External {
-                    cmds: vec![
-                        ExternalCmd {
+                    cmds: Pipeline::Out(
+                        Box::new(Pipeline::Src(ExternalCmd {
                             args: vec!["ls".to_string(), "-laF".to_string()],
                             redirect: None,
-                        },
+                        })),
                         ExternalCmd {
                             args: vec!["grep".to_string(), "'a'".to_string()],
                             redirect: None,
                         }
-                    ],
+                    ),
                     is_bg: false,
                 },
                 vec![].into()
@@ -914,16 +920,16 @@ mod job {
             ),
             vec![(
                 Job::External {
-                    cmds: vec![
-                        ExternalCmd {
+                    cmds: Pipeline::Out(
+                        Box::new(Pipeline::Src(ExternalCmd {
                             args: vec!["ls".to_string(), "-laF".to_string()],
                             redirect: None,
-                        },
+                        })),
                         ExternalCmd {
                             args: vec!["grep".to_string(), "'a'".to_string()],
                             redirect: None,
                         }
-                    ],
+                    ),
                     is_bg: true,
                 },
                 vec![].into()
@@ -986,25 +992,25 @@ mod parse_cmd {
             vec![(
                 vec![
                     Job::External {
-                        cmds: vec![
-                            ExternalCmd {
+                        cmds: Pipeline::Out(
+                            Box::new(Pipeline::Src(ExternalCmd {
                                 args: vec!["ls".to_string(), "-laF".to_string()],
-                                redirect: None,
-                            },
+                                redirect: None
+                            })),
                             ExternalCmd {
                                 args: vec!["grep".to_string(), "'a'".to_string()],
-                                redirect: None,
+                                redirect: None
                             }
-                        ],
-                        is_bg: true,
+                        ),
+                        is_bg: true
                     },
                     Job::BuiltIn {
                         cmd: BuiltInCmd::Cd(Some("~/app".to_string())),
-                        is_bg: true,
+                        is_bg: true
                     },
                     Job::BuiltIn {
                         cmd: BuiltInCmd::Exit(Some(1)),
-                        is_bg: false,
+                        is_bg: false
                     }
                 ],
                 vec![].into()

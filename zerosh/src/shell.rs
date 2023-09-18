@@ -541,21 +541,42 @@ impl Worker {
 fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
     // TODO: Stdout 以外のリダイレクトにも対応する
     fn handle_redirect(cmd: &model::ExternalCmd) {
-        if let Some(model::Redirection::StdOut(ref out)) = cmd.redirect {
-            let fd = syscall(move || {
-                nix::fcntl::open(
-                    out.as_str(),
-                    nix::fcntl::OFlag::O_WRONLY | nix::fcntl::OFlag::O_CREAT,
-                    nix::sys::stat::Mode::S_IRWXU,
-                )
-            })
-            .unwrap();
-            syscall(|| {
-                close(libc::STDOUT_FILENO).unwrap();
-                dup2(fd, libc::STDOUT_FILENO).unwrap();
-                close(fd)
-            })
-            .unwrap();
+        match cmd.redirect {
+            Some(model::Redirection::StdOut(ref out)) => {
+                let fd = syscall(move || {
+                    nix::fcntl::open(
+                        out.as_str(),
+                        nix::fcntl::OFlag::O_WRONLY | nix::fcntl::OFlag::O_CREAT,
+                        nix::sys::stat::Mode::S_IRWXU,
+                    )
+                })
+                .unwrap();
+                syscall(|| {
+                    close(libc::STDOUT_FILENO).unwrap();
+                    dup2(fd, libc::STDOUT_FILENO).unwrap();
+                    close(fd)
+                })
+                .unwrap();
+            }
+            Some(model::Redirection::Both(ref out)) => {
+                let fd = syscall(move || {
+                    nix::fcntl::open(
+                        out.as_str(),
+                        nix::fcntl::OFlag::O_WRONLY | nix::fcntl::OFlag::O_CREAT,
+                        nix::sys::stat::Mode::S_IRWXU,
+                    )
+                })
+                .unwrap();
+                syscall(|| {
+                    close(libc::STDOUT_FILENO).unwrap();
+                    close(libc::STDERR_FILENO).unwrap();
+                    dup2(fd, libc::STDOUT_FILENO).unwrap();
+                    dup2(fd, libc::STDERR_FILENO).unwrap();
+                    close(fd)
+                })
+                .unwrap();
+            }
+            None => {}
         }
     }
 
