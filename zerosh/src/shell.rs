@@ -235,7 +235,7 @@ impl Worker {
                     }
                     WorkerMsg::Signal(sig) => {
                         // 無視
-                        log::debug!("signal: {sig:?} received and ignore it");
+                        eprintln!("signal: {sig:?} received and ignore it");
                     }
                 }
             }
