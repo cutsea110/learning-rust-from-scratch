@@ -27,13 +27,12 @@ pub enum Pipeline {
     Out(Box<Pipeline>, ExternalCmd),
     Both(Box<Pipeline>, ExternalCmd),
 }
-impl Pipeline {
-    // TODO: Display にする
-    pub fn cmd_line(&self) -> String {
+impl fmt::Display for Pipeline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            Pipeline::Src(cmd) => format!("{}", cmd),
-            Pipeline::Out(p, cmd) => format!("{} | {}", p.cmd_line(), cmd),
-            Pipeline::Both(p, cmd) => format!("{} |& {}", p.cmd_line(), cmd),
+            Pipeline::Src(cmd) => write!(f, "{}", cmd),
+            Pipeline::Out(p, cmd) => write!(f, "{} | {}", p, cmd),
+            Pipeline::Both(p, cmd) => write!(f, "{} |& {}", p, cmd),
         }
     }
 }
