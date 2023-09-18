@@ -24,6 +24,15 @@ pub enum Pipeline {
     Out(Box<Pipeline>, ExternalCmd),
     Both(Box<Pipeline>, ExternalCmd),
 }
+impl Pipeline {
+    pub fn cmd_line(&self) -> String {
+        match &self {
+            Pipeline::Src(cmd) => cmd.cmd_line(),
+            Pipeline::Out(p, cmd) => format!("{} | {}", p.cmd_line(), cmd.cmd_line()),
+            Pipeline::Both(p, cmd) => format!("{} |& {}", p.cmd_line(), cmd.cmd_line()),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ExternalCmd {

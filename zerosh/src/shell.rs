@@ -358,7 +358,7 @@ impl Worker {
         if !is_bg {
             // ジョブ情報を追加して子プロセスをフォアグラウンドプロセスグループにする
             self.fg = Some(pgid);
-            let line = "dummy";
+            let line = cmd.cmd_line();
             self.insert_job(job_id, pgid, pids, &line);
             tcsetpgrp(libc::STDIN_FILENO, pgid).unwrap();
         }
