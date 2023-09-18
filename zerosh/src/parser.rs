@@ -20,7 +20,7 @@
 //!
 mod combinator;
 
-use crate::model::{self, *};
+use crate::model::*;
 use combinator::*;
 
 /// tokenize command line
@@ -830,7 +830,7 @@ fn job() -> impl Parser<Output = Job> + Clone {
                 is_bg: bg.is_some(),
             })
         }),
-        bind(munch1_with_sep(external_cmd(), pipe()), |cmds| {
+        bind(pipeline(), |cmds| {
             apply(optional(literal("&")), move |bg| Job::External {
                 cmds: cmds.clone(),
                 is_bg: bg.is_some(),

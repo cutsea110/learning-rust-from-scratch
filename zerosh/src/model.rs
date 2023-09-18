@@ -47,5 +47,5 @@ impl ExternalCmd {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Job {
     BuiltIn { cmd: BuiltInCmd, is_bg: bool },
-    External { cmds: Vec<ExternalCmd>, is_bg: bool },
+    External { cmds: Pipeline, is_bg: bool },
 }

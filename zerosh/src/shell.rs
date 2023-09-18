@@ -14,7 +14,6 @@ use nix::{
 };
 use rustyline::{error::ReadlineError, Editor};
 use signal_hook::{consts::*, iterator::Signals};
-use std::collections::VecDeque;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ffi::CString,
@@ -211,8 +210,8 @@ impl Worker {
                                             // 組み込みコマンドなら worker_rx から受信
                                             continue;
                                         }
-                                        model::Job::External { cmds, is_bg } => {
-                                            if !self.spawn_child(&cmds, is_bg) {
+                                        model::Job::External { mut cmds, is_bg } => {
+                                            if !self.spawn_child(&mut cmds, is_bg) {
                                                 // 子プロセス生成に失敗した場合、シェルからの入力を再開
                                                 shell_tx
                                                     .send(ShellMsg::Continue(self.exit_val))
@@ -334,9 +333,7 @@ impl Worker {
     }
 
     /// 子プロセスを生成。失敗した場合はシェルからの入力を再開する必要がある
-    fn spawn_child(&mut self, cmd: &[model::ExternalCmd], is_bg: bool) -> bool {
-        assert_ne!(cmd.len(), 0);
-
+    fn spawn_child(&mut self, cmd: &mut model::Pipeline, is_bg: bool) -> bool {
         // ジョブ ID を取得
         let job_id = if let Some(id) = self.get_new_job_id() {
             id
@@ -348,7 +345,7 @@ impl Worker {
         let pgid;
         let mut pids = HashMap::new();
         // ジョブを処理するベースとなるプロセスを生成
-        match fork_exec(Pid::from_raw(0), &cmd, &mut pids) {
+        match fork_exec(Pid::from_raw(0), cmd, &mut pids) {
             Ok(child) => {
                 pgid = child;
             }
@@ -361,11 +358,7 @@ impl Worker {
         if !is_bg {
             // ジョブ情報を追加して子プロセスをフォアグラウンドプロセスグループにする
             self.fg = Some(pgid);
-            let line = cmd
-                .iter()
-                .map(|x| x.cmd_line())
-                .collect::<Vec<String>>()
-                .join(" | ");
+            let line = "dummy";
             self.insert_job(job_id, pgid, pids, &line);
             tcsetpgrp(libc::STDIN_FILENO, pgid).unwrap();
         }
@@ -545,17 +538,9 @@ impl Worker {
     }
 }
 
-fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, ProcInfo>) {
-    let cmd = cmds.pop_back().unwrap();
-    let filename = CString::new(cmd.filename()).unwrap();
-    let args = cmd
-        .args
-        .iter()
-        .map(|s| CString::new(s.as_str()).unwrap())
-        .collect::<Vec<_>>();
-
+fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
     // TODO: Stdout 以外のリダイレクトにも対応する
-    let handle_redirect = || {
+    fn handle_redirect(cmd: &model::ExternalCmd) {
         if let Some(model::Redirection::StdOut(ref out)) = cmd.redirect {
             let fd = syscall(move || {
                 nix::fcntl::open(
@@ -572,62 +557,129 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
             })
             .unwrap();
         }
-    };
+    }
 
-    if cmds.is_empty() {
-        // リダイレクト処理
-        handle_redirect();
+    match cmds {
+        model::Pipeline::Src(cmd) => {
+            // リダイレクト処理
+            handle_redirect(cmd);
+            let filename = CString::new(cmd.filename()).unwrap();
+            let args = cmd
+                .args
+                .iter()
+                .map(|s| CString::new(s.as_str()).unwrap())
+                .collect::<Vec<_>>();
 
-        match execvp(&filename, &args) {
-            Err(e) => {
-                eprintln!("{NAME}: Failed to exec: {e}");
-                exit(1);
+            match execvp(&filename, &args) {
+                Err(e) => {
+                    eprintln!("{NAME}: Failed to exec: {e}");
+                    exit(1);
+                }
+                Ok(_) => unreachable!(),
             }
-            Ok(_) => unreachable!(),
         }
-    } else {
-        let p = pipe().unwrap();
-        match syscall(|| unsafe { fork() }).unwrap() {
-            ForkResult::Child => {
-                // 子プロセスならパイプを stdout に dup2 して再帰
-                syscall(|| {
-                    close(p.0).unwrap();
-                    dup2(p.1, libc::STDOUT_FILENO).unwrap();
-                    close(p.1)
-                })
-                .unwrap();
+        model::Pipeline::Out(cmds, cmd) => {
+            let p = pipe().unwrap();
+            let filename = CString::new(cmd.filename()).unwrap();
+            let args = cmd
+                .args
+                .iter()
+                .map(|s| CString::new(s.as_str()).unwrap())
+                .collect::<Vec<_>>();
 
-                do_pipeline(cmds, pids);
-            }
-            ForkResult::Parent { child } => {
-                // リダイレクト処理
-                handle_redirect();
+            match syscall(|| unsafe { fork() }).unwrap() {
+                ForkResult::Child => {
+                    // 子プロセスならパイプを stdout に dup2 して再帰
+                    syscall(|| {
+                        close(p.0).unwrap();
+                        dup2(p.1, libc::STDOUT_FILENO).unwrap();
+                        close(p.1)
+                    })
+                    .unwrap();
 
-                // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
-                syscall(|| {
-                    close(p.1).unwrap();
-                    dup2(p.0, libc::STDIN_FILENO).unwrap();
-                    close(p.0)
-                })
-                .unwrap();
+                    do_pipeline(cmds, pids);
+                }
+                ForkResult::Parent { child } => {
+                    // リダイレクト処理
+                    handle_redirect(cmd);
 
-                pids.insert(
-                    child,
-                    ProcInfo {
-                        state: ProcState::Run,
-                        pgid: getpgid(None).unwrap(),
-                    },
-                );
-                match execvp(&filename, &args) {
-                    Err(e) => {
-                        eprintln!("{NAME}: Failed to exec: {e}");
-                        exit(1);
+                    // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
+                    syscall(|| {
+                        close(p.1).unwrap();
+                        dup2(p.0, libc::STDIN_FILENO).unwrap();
+                        close(p.0)
+                    })
+                    .unwrap();
+
+                    pids.insert(
+                        child,
+                        ProcInfo {
+                            state: ProcState::Run,
+                            pgid: getpgid(None).unwrap(),
+                        },
+                    );
+                    match execvp(&filename, &args) {
+                        Err(e) => {
+                            eprintln!("{NAME}: Failed to exec: {e}");
+                            exit(1);
+                        }
+                        Ok(_) => unreachable!(),
                     }
-                    Ok(_) => unreachable!(),
                 }
             }
         }
-    }
+        model::Pipeline::Both(cmds, cmd) => {
+            let p = pipe().unwrap();
+            let filename = CString::new(cmd.filename()).unwrap();
+            let args = cmd
+                .args
+                .iter()
+                .map(|s| CString::new(s.as_str()).unwrap())
+                .collect::<Vec<_>>();
+
+            match syscall(|| unsafe { fork() }).unwrap() {
+                ForkResult::Child => {
+                    // 子プロセスならパイプを stdout と stderr に dup2 して再帰
+                    syscall(|| {
+                        close(p.0).unwrap();
+                        dup2(p.1, libc::STDOUT_FILENO).unwrap();
+                        dup2(p.1, libc::STDERR_FILENO).unwrap();
+                        close(p.1)
+                    })
+                    .unwrap();
+
+                    do_pipeline(cmds, pids);
+                }
+                ForkResult::Parent { child } => {
+                    // リダイレクト処理
+                    handle_redirect(cmd);
+
+                    // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
+                    syscall(|| {
+                        close(p.1).unwrap();
+                        dup2(p.0, libc::STDIN_FILENO).unwrap();
+                        close(p.0)
+                    })
+                    .unwrap();
+
+                    pids.insert(
+                        child,
+                        ProcInfo {
+                            state: ProcState::Run,
+                            pgid: getpgid(None).unwrap(),
+                        },
+                    );
+                    match execvp(&filename, &args) {
+                        Err(e) => {
+                            eprintln!("{NAME}: Failed to exec: {e}");
+                            exit(1);
+                        }
+                        Ok(_) => unreachable!(),
+                    }
+                }
+            }
+        }
+    };
 }
 
 /// プロセスグループ ID を指定して fork & exec
@@ -637,7 +689,7 @@ fn do_pipeline(cmds: &mut VecDeque<model::ExternalCmd>, pids: &mut HashMap<Pid, 
 /// - output が Some(fd) の場合は、標準出力を fd と設定
 fn fork_exec(
     pgid: Pid,
-    cmds: &[model::ExternalCmd],
+    cmds: &mut model::Pipeline,
     pids: &mut HashMap<Pid, ProcInfo>,
 ) -> Result<Pid, DynError> {
     match syscall(|| unsafe { fork() })? {
@@ -658,7 +710,7 @@ fn fork_exec(
             // 子プロセスのプロセスグループ ID を pgid に設定
             setpgid(Pid::from_raw(0), pgid).unwrap();
 
-            do_pipeline(&mut VecDeque::from(cmds.to_vec()), pids);
+            do_pipeline(cmds, pids);
 
             Ok(getpid())
         }
