@@ -622,6 +622,7 @@ fn is_separator(s: String) -> bool {
         "<".to_string(),
         ">".to_string(),
         ">&".to_string(),
+        ">>".to_string(),
     ]
     .contains(&s)
 }
@@ -649,13 +650,17 @@ mod symbol {
 }
 
 fn redirect() -> impl Parser<Output = Redirection> + Clone {
-    bind(altl(literal(">"), literal(">&")), |r| {
-        apply(symbol(), move |file| match r.as_str() {
-            ">" => Redirection::StdOut(file),
-            ">&" => Redirection::Both(file),
-            _ => unreachable!(),
-        })
-    })
+    bind(
+        altl(altl(literal(">"), literal(">&")), literal(">>")),
+        |r| {
+            apply(symbol(), move |file| match r.as_str() {
+                ">" => Redirection::StdOut(file),
+                ">&" => Redirection::Both(file),
+                ">>" => Redirection::Append(file),
+                _ => unreachable!(),
+            })
+        },
+    )
 }
 #[cfg(test)]
 mod redirect {

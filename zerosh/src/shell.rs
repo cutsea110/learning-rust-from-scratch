@@ -576,6 +576,22 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
                 })
                 .unwrap();
             }
+            Some(model::Redirection::Append(ref out)) => {
+                let fd = syscall(move || {
+                    nix::fcntl::open(
+                        out.as_str(),
+                        nix::fcntl::OFlag::O_WRONLY | nix::fcntl::OFlag::O_APPEND,
+                        nix::sys::stat::Mode::S_IRWXU,
+                    )
+                })
+                .unwrap();
+                syscall(|| {
+                    close(libc::STDOUT_FILENO).unwrap();
+                    dup2(fd, libc::STDOUT_FILENO).unwrap();
+                    close(fd)
+                })
+                .unwrap();
+            }
             None => {}
         }
     }

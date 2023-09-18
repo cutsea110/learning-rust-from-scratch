@@ -10,6 +10,7 @@ pub enum BuiltInCmd {
 pub enum Redirection {
     StdOut(String), // > file
     Both(String),   // >& file
+    Append(String), // >> file
 }
 
 #[derive(Debug, PartialEq, Clone)]
