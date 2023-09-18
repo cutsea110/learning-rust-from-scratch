@@ -1,5 +1,6 @@
 use crate::helper::DynError;
 use crate::model;
+use crate::model::ExternalCmd;
 use crate::parser;
 use nix::{
     libc,
@@ -594,17 +595,21 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
             None => {}
         }
     }
+    fn get_filename_and_args(cmd: &ExternalCmd) -> (CString, Vec<CString>) {
+        let filename = CString::new(cmd.filename()).unwrap();
+        let args = cmd
+            .args
+            .iter()
+            .map(|s| CString::new(s.as_str()).unwrap())
+            .collect::<Vec<_>>();
+        (filename, args)
+    }
 
     match cmds {
         model::Pipeline::Src(cmd) => {
             // リダイレクト処理
             handle_redirect(cmd);
-            let filename = CString::new(cmd.filename()).unwrap();
-            let args = cmd
-                .args
-                .iter()
-                .map(|s| CString::new(s.as_str()).unwrap())
-                .collect::<Vec<_>>();
+            let (filename, args) = get_filename_and_args(cmd);
 
             match execvp(&filename, &args) {
                 Err(e) => {
@@ -616,12 +621,7 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
         }
         model::Pipeline::Out(cmds, cmd) => {
             let p = pipe().unwrap();
-            let filename = CString::new(cmd.filename()).unwrap();
-            let args = cmd
-                .args
-                .iter()
-                .map(|s| CString::new(s.as_str()).unwrap())
-                .collect::<Vec<_>>();
+            let (filename, args) = get_filename_and_args(cmd);
 
             match syscall(|| unsafe { fork() }).unwrap() {
                 ForkResult::Child => {
@@ -666,12 +666,7 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
         }
         model::Pipeline::Both(cmds, cmd) => {
             let p = pipe().unwrap();
-            let filename = CString::new(cmd.filename()).unwrap();
-            let args = cmd
-                .args
-                .iter()
-                .map(|s| CString::new(s.as_str()).unwrap())
-                .collect::<Vec<_>>();
+            let (filename, args) = get_filename_and_args(cmd);
 
             match syscall(|| unsafe { fork() }).unwrap() {
                 ForkResult::Child => {
