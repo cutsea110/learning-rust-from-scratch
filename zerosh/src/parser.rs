@@ -1080,8 +1080,6 @@ pub fn parse(line: &str) -> Result<Vec<Job>, ParseError> {
 
     match jobs.pop() {
         Some((jobs, rest)) => {
-            println!("jobs={jobs:?}, rest={rest:?}");
-
             if rest.is_empty() {
                 Ok(jobs)
             } else {
