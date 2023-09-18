@@ -117,8 +117,28 @@ fn tokenize(line: &str) -> Vec<(usize, String)> {
 
                 result.push((len - chars.clone().count() - 1, c.to_string()));
             }
+            // ">", ">>", ">&" の場合
+            c if c == '>' => {
+                if token.len() > 0 {
+                    result.push((
+                        len - chars.clone().count() - token.len() - 1,
+                        take(&mut token),
+                    ));
+                }
+
+                if let Some(&next_c) = chars.peek() {
+                    if next_c == c || next_c == '&' {
+                        chars.next();
+                        let cc = String::from_utf8(vec![c as u8, next_c as u8]).unwrap();
+                        result.push((len - chars.clone().count() - 2, cc));
+                        continue;
+                    }
+                }
+
+                result.push((len - chars.clone().count() - 1, c.to_string()));
+            }
             // これらは 1 文字トークン
-            '(' | ')' | ';' | '<' | '>' => {
+            '(' | ')' | ';' | '<' => {
                 if token.len() > 0 {
                     result.push((
                         len - chars.clone().count() - token.len() - 1,
@@ -601,6 +621,7 @@ fn is_separator(s: String) -> bool {
         ";".to_string(),
         "<".to_string(),
         ">".to_string(),
+        ">&".to_string(),
     ]
     .contains(&s)
 }
@@ -1059,6 +1080,8 @@ pub fn parse(line: &str) -> Result<Vec<Job>, ParseError> {
 
     match jobs.pop() {
         Some((jobs, rest)) => {
+            println!("jobs={jobs:?}, rest={rest:?}");
+
             if rest.is_empty() {
                 Ok(jobs)
             } else {
