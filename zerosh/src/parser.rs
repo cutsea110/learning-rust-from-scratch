@@ -595,6 +595,7 @@ fn is_separator(s: String) -> bool {
     vec![
         "&".to_string(),
         "|".to_string(),
+        "|&".to_string(),
         "(".to_string(),
         ")".to_string(),
         ";".to_string(),
@@ -701,6 +702,22 @@ fn pipe() -> impl Parser<Output = Pipe> + Clone {
         _ => unreachable!(),
     })
 }
+#[cfg(test)]
+mod pipe {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            pipe().parse(vec![(0, "|".to_string())].into()),
+            vec![(Pipe::StdOut, vec![].into())]
+        );
+        assert_eq!(
+            pipe().parse(vec![(0, "|&".to_string())].into()),
+            vec![(Pipe::Both, vec![].into())]
+        );
+    }
+}
 
 /// pipeline parser
 fn pipeline() -> impl Parser<Output = Pipeline> + Clone {
@@ -718,6 +735,91 @@ fn pipeline() -> impl Parser<Output = Pipeline> + Clone {
             acc
         })
     })
+}
+#[cfg(test)]
+mod pipeline {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            pipeline().parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, "|".to_string()),
+                    (2, "bar".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                Pipeline::Out(
+                    Box::new(Pipeline::Src(ExternalCmd {
+                        args: vec!["foo".to_string()],
+                        redirect: None,
+                    })),
+                    ExternalCmd {
+                        args: vec!["bar".to_string()],
+                        redirect: None,
+                    }
+                ),
+                vec![].into()
+            )]
+        );
+        assert_eq!(
+            pipeline().parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, "|&".to_string()),
+                    (2, "bar".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                Pipeline::Both(
+                    Box::new(Pipeline::Src(ExternalCmd {
+                        args: vec!["foo".to_string()],
+                        redirect: None,
+                    })),
+                    ExternalCmd {
+                        args: vec!["bar".to_string()],
+                        redirect: None,
+                    }
+                ),
+                vec![].into()
+            )]
+        );
+        assert_eq!(
+            pipeline().parse(
+                vec![
+                    (0, "foo".to_string()),
+                    (1, "|".to_string()),
+                    (2, "bar".to_string()),
+                    (3, "|&".to_string()),
+                    (4, "buz".to_string())
+                ]
+                .into()
+            ),
+            vec![(
+                Pipeline::Both(
+                    Box::new(Pipeline::Out(
+                        Box::new(Pipeline::Src(ExternalCmd {
+                            args: vec!["foo".to_string()],
+                            redirect: None,
+                        })),
+                        ExternalCmd {
+                            args: vec!["bar".to_string()],
+                            redirect: None,
+                        }
+                    )),
+                    ExternalCmd {
+                        args: vec!["buz".to_string()],
+                        redirect: None,
+                    }
+                ),
+                vec![].into()
+            )]
+        );
+    }
 }
 
 /// job parser
