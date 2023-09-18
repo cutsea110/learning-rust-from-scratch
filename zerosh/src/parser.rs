@@ -721,16 +721,14 @@ mod pipe {
 
 /// pipeline parser
 fn pipeline() -> impl Parser<Output = Pipeline> + Clone {
-    let src = external_cmd();
-    let tpl = tuple(pipe(), external_cmd());
-    bind(src, move |cmd| {
-        apply(munch(tpl.clone()), move |cmds| {
+    bind(external_cmd(), move |cmd| {
+        apply(munch(tuple(pipe(), external_cmd())), move |cmds| {
             let mut acc = Pipeline::Src(cmd.clone());
             for (p, cmd) in cmds {
-                match &p {
-                    Pipe::StdOut => acc = Pipeline::Out(Box::new(acc), cmd),
-                    Pipe::Both => acc = Pipeline::Both(Box::new(acc), cmd),
-                }
+                acc = match &p {
+                    Pipe::StdOut => Pipeline::Out(Box::new(acc), cmd),
+                    Pipe::Both => Pipeline::Both(Box::new(acc), cmd),
+                };
             }
             acc
         })
