@@ -413,7 +413,7 @@ impl Worker {
         self.pgid_to_pids.insert(pgid, (job_id, procs)); // プロセスグループ情報を追加
     }
 
-    /// プロセスの実行状態を設定し、依然の状態を返す
+    /// プロセスの実行状態を設定し、以前の状態を返す
     /// pid が存在しない場合は None を返す
     fn set_pid_state(&mut self, pid: Pid, state: ProcState) -> Option<ProcState> {
         let info = self.pid_to_info.get_mut(&pid)?;
