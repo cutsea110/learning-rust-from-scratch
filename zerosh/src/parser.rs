@@ -1065,14 +1065,12 @@ mod parse_cmd {
 pub enum ParseError {
     Invalid,
     Unknown,
-    Unexpected,
 }
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseError::Invalid => write!(f, "invalid"),
             ParseError::Unknown => write!(f, "unknown"),
-            ParseError::Unexpected => write!(f, "unexpected"),
         }
     }
 }
