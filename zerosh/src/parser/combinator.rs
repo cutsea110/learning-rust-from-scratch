@@ -54,6 +54,7 @@ where
 /// );
 /// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
 /// ```
+#[allow(dead_code)]
 pub fn satisfy<F: Fn(String) -> bool>(pred: F) -> Sat<F> {
     Sat { pred }
 }
@@ -99,6 +100,7 @@ impl Parser for Lit {
 /// );
 /// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
 /// ```
+#[allow(dead_code)]
 pub fn literal(s: &'static str) -> Lit {
     Lit { s }
 }
@@ -137,6 +139,7 @@ impl<T: Clone> Parser for Empty<T> {
 ///     vec![(42, vec![(0, "foo".to_string())].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn empty<T: Clone>(x: T) -> Empty<T> {
     Empty(x)
 }
@@ -184,6 +187,7 @@ impl<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser> Parser for Bind<T, P, F
 /// );
 /// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
 /// ```
+#[allow(dead_code)]
 pub fn bind<T, P: Parser<Output = T>, F: Fn(T) -> Q, Q: Parser>(px: P, f: F) -> Bind<T, P, F, Q> {
     Bind { px, f }
 }
@@ -230,6 +234,7 @@ impl<T: Clone, U, P: Parser<Output = T>, F: Fn(T) -> U> Parser for Apply<T, U, P
 /// );
 /// assert_eq!(p.parse(vec![(0, "bar".to_string())].into()), vec![]);
 /// ```
+#[allow(dead_code)]
 pub fn apply<T, U, P: Parser<Output = T>, F: Fn(T) -> U>(px: P, f: F) -> Apply<T, U, P, F> {
     Apply { px, f }
 }
@@ -286,6 +291,7 @@ impl<T: Clone, U, V, P: Parser<Output = T>, Q: Parser<Output = U>> Parser
 /// );
 /// assert_eq!(p.parse(vec![(0, "foobar".to_string())].into()), vec![]);
 /// ```
+#[allow(dead_code)]
 pub fn apply2<T, U, V, P: Parser<Output = T>, Q: Parser<Output = U>>(
     px: P,
     qx: Q,
@@ -349,6 +355,7 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for Alt<T, P, Q> {
 ///     ]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn alt<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> Alt<T, P, Q> {
     Alt { px, qx }
 }
@@ -427,6 +434,7 @@ impl<T, P: Parser<Output = T>, Q: Parser<Output = T>> Parser for AltL<T, P, Q> {
 ///     ]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn altl<T, P: Parser<Output = T>, Q: Parser<Output = T>>(px: P, qx: Q) -> AltL<T, P, Q> {
     AltL { px, qx }
 }
@@ -502,6 +510,7 @@ impl<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>> Parser
 ///     )]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn ap<T, U, F: Fn(&T) -> U, P: Parser<Output = T>, Q: Parser<Output = F>>(
     px: P,
     pf: Q,
@@ -579,6 +588,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for OneOrMore<T, P> {
 ///     ]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn one_or_more<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> OneOrMore<T, P> {
     OneOrMore { p }
 }
@@ -684,6 +694,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for ZeroOrMore<T, P> {
 ///     ]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn zero_or_more<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> ZeroOrMore<T, P> {
     ZeroOrMore { p }
 }
@@ -805,6 +816,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch1<T, P> {
 ///     )]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn munch1<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> Munch1<T, P> {
     Munch1 { px: p }
 }
@@ -885,6 +897,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone> Parser for Munch<T, P> {
 ///     )]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn munch<T: Clone, P: Parser<Output = T> + Clone>(p: P) -> Munch<T, P> {
     Munch { px: p }
 }
@@ -960,6 +973,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for With
 ///     vec![("foo".to_string(), vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn with<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
     p: P,
     with: Q,
@@ -1009,6 +1023,7 @@ impl<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone> Parser for Skip
 ///     vec![("bar".to_string(), vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn skip<T: Clone, Q: Parser + Clone, P: Parser<Output = T> + Clone>(
     skip: Q,
     p: P,
@@ -1083,6 +1098,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser
 ///     ]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn one_or_more_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
     p: P,
     sep: Q,
@@ -1214,6 +1230,7 @@ impl<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone> Parser for Munc
 ///     ]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn munch1_with_sep<T: Clone, P: Parser<Output = T> + Clone, Q: Parser + Clone>(
     p: P,
     sep: Q,
@@ -1293,6 +1310,7 @@ impl Parser for Int32 {
 ///     vec![(123, vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn int32() -> Int32 {
     Int32
 }
@@ -1323,6 +1341,7 @@ mod int32 {
 ///     vec![((), vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn spaces() -> impl Parser<Output = ()> + Clone {
     apply(
         munch1(satisfy(|s| s.chars().all(|c| c.is_whitespace()))),
@@ -1358,6 +1377,7 @@ mod spaces {
 ///     vec![("foo".to_string(), vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn string() -> impl Parser<Output = String> + Clone {
     satisfy(|_| true)
 }
@@ -1393,6 +1413,7 @@ mod string {
 ///     vec![(None, vec![(0, "bar".to_string())].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn optional<T: Clone, P>(p: P) -> impl Parser<Output = Option<T>> + Clone
 where
     P: Parser<Output = T> + Clone,
@@ -1432,6 +1453,7 @@ mod optional {
 ///     vec![(("foo".to_string(), "bar".to_string()), vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn tuple<T: Clone, U: Clone, P, Q>(p: P, q: Q) -> impl Parser<Output = (T, U)> + Clone
 where
     P: Parser<Output = T> + Clone,
@@ -1475,6 +1497,7 @@ mod tuple {
 ///     vec![("foo".to_string(), vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn bracket<T: Clone, L, P, R>(l: L, p: P, r: R) -> impl Parser<Output = T> + Clone
 where
     L: Parser + Clone,
@@ -1542,6 +1565,7 @@ mod bracket {
 ///     vec![("foo".to_string(), vec![].into())]
 /// );
 /// ```
+#[allow(dead_code)]
 pub fn parens<T: Clone, P>(p: P) -> impl Parser<Output = T> + Clone
 where
     P: Parser<Output = T> + Clone,
