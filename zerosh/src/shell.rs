@@ -363,6 +363,7 @@ impl Worker {
 
         // ジョブ情報を追加
         self.insert_job(job_id, pgid, pids, &cmd.to_string());
+
         if is_bg {
             // 子プロセスをバックグラウンドプロセスグループにする
             self.set_shell_fg(shell_tx);
