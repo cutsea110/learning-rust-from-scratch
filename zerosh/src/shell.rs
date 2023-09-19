@@ -212,7 +212,7 @@ impl Worker {
                                             continue;
                                         }
                                         model::Job::External { mut cmds, is_bg } => {
-                                            if !self.spawn_child(&mut cmds, is_bg) {
+                                            if !self.spawn_child(&mut cmds, is_bg, &shell_tx) {
                                                 // 子プロセス生成に失敗した場合、シェルからの入力を再開
                                                 shell_tx
                                                     .send(ShellMsg::Continue(self.exit_val))
@@ -334,7 +334,12 @@ impl Worker {
     }
 
     /// 子プロセスを生成。失敗した場合はシェルからの入力を再開する必要がある
-    fn spawn_child(&mut self, cmd: &mut model::Pipeline, is_bg: bool) -> bool {
+    fn spawn_child(
+        &mut self,
+        cmd: &mut model::Pipeline,
+        is_bg: bool,
+        shell_tx: &SyncSender<ShellMsg>,
+    ) -> bool {
         // ジョブ ID を取得
         let job_id = if let Some(id) = self.get_new_job_id() {
             id
@@ -356,10 +361,14 @@ impl Worker {
             }
         }
 
-        if !is_bg {
-            // ジョブ情報を追加して子プロセスをフォアグラウンドプロセスグループにする
+        // ジョブ情報を追加
+        self.insert_job(job_id, pgid, pids, &cmd.to_string());
+        if is_bg {
+            // 子プロセスをバックグラウンドプロセスグループにする
+            self.set_shell_fg(shell_tx);
+        } else {
+            // 子プロセスをフォアグラウンドプロセスグループにする
             self.fg = Some(pgid);
-            self.insert_job(job_id, pgid, pids, &cmd.to_string());
             tcsetpgrp(libc::STDIN_FILENO, pgid).unwrap();
         }
 
