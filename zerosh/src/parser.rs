@@ -12,8 +12,8 @@
 //! # Priority of control code
 //!
 //! - [ ] parenthesis "()","{}","``","$()"
-//! - [ ] redirection "<",">",">>"
-//! - [x] pipe "|"
+//! - [x] redirection ">",">>",">&"
+//! - [x] pipe "|","|&"
 //! - [ ] logic operator "&&","||"
 //! - [x] background "&"
 //! - [ ] semicolon ";"
