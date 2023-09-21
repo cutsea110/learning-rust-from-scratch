@@ -11,5 +11,13 @@ fn main() {
 }
 
 fn ackerman(m: usize, n: BigUint) -> BigUint {
-    todo!()
+    let one: BigUint = One::one();
+    let zero: BigUint = Zero::zero();
+    if m == 0 {
+        n + one
+    } else if n == zero {
+        ackerman(m - 1, one)
+    } else {
+        ackerman(m - 1, ackerman(m, n - one))
+    }
 }
