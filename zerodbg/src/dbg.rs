@@ -50,5 +50,20 @@ impl ZDbg<NotRunning> {
 
 /// Running 時に呼び出し可能なメソッド
 impl ZDbg<Running> {
-    // TODO
+    fn do_stepi(self) -> Result<State, DynError> {
+        todo!()
+    }
+}
+
+fn do_help() {
+    println!(
+        r#"コマンド一覧 (括弧内は省略記法)
+break 0x8000  : ブレークポイントを 0x8000 番地に設定 (b 0x8000)
+run           : プログラムを実行 (r)
+continue      : プログラムを再開 (c)
+stepi         : 機械語レベルで 1 ステップ実行 (s)
+registers     : レジスタを表示 (regs)
+exit          : 終了 (q)
+help          : このヘルプを表示 (h)"#
+    );
 }
