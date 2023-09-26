@@ -40,7 +40,23 @@ pub enum State {
 
 /// Running と NotRunning で共通の実装
 impl<T> ZDbg<T> {
-    // TODO
+    /// ブレークポイントのアドレスを設定する関数
+    /// 子プロセスのメモリ上には反映しない
+    /// アドレス設定に成功した場合は true を返す
+    fn set_break_addr(&mut self, cmd: &[&str]) -> bool {
+        if self.info.brk_addr.is_some() {
+            println!(
+                "ブレークポイントは設定済みです : Addr = {:?}>>",
+                self.info.brk_addr.unwrap()
+            );
+            false
+        } else if let Some(addr) = get_break_addr(cmd) {
+            self.info.brk_addr = Some(addr); // ブレークポイントのアドレスを設定
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// NotRunning 時に呼び出し可能なメソッド
@@ -55,6 +71,7 @@ impl ZDbg<Running> {
     }
 }
 
+/// ヘルプを表示
 fn do_help() {
     println!(
         r#"コマンド一覧 (括弧内は省略記法)
@@ -66,4 +83,28 @@ registers     : レジスタを表示 (regs)
 exit          : 終了 (q)
 help          : このヘルプを表示 (h)"#
     );
+}
+
+/// コマンドからブレークポイントを計算
+fn get_break_addr(cmd: &[&str]) -> Option<*mut c_void> {
+    if cmd.len() < 2 {
+        eprintln!("アドレスを指定してください\n 例 : break 0x8000>>");
+        return None;
+    }
+
+    let addr_str = cmd[1];
+    if &addr_str[0..2] != "0x" {
+        eprintln!("<<アドレスは 16 進数でのみ指定可能です\n 例 : break 0x8000>>");
+        return None;
+    }
+
+    let addr = match usize::from_str_radix(&addr_str[2..], 16) {
+        Ok(addr) => addr,
+        Err(e) => {
+            eprintln!("<<アドレス変換エラー : {e}>>");
+            return None;
+        }
+    } as *mut c_void;
+
+    Some(addr)
 }
