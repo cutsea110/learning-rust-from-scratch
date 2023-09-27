@@ -167,19 +167,48 @@ impl ZDbg<Running> {
 
         Ok(State::Running(self))
     }
+    /// stepi を実行。機械語レベルで 1 行実行
     fn do_stepi(self) -> Result<State, DynError> {
+        let regs = ptrace::getregs(self.info.pid)?;
+        if Some((regs.rip) as *mut c_void) == self.info.brk_addr {
+            // 次の実行先がブレークポイントのアドレスの場合、
+            // 先に、 0xcc(int 3) に書き換えたメモリを元に戻してから実行する必要がある
+            unsafe {
+                ptrace::write(
+                    self.info.pid,
+                    self.info.brk_addr.unwrap(),
+                    self.info.brk_val as *mut c_void,
+                )?
+            };
+            self.step_and_break()
+        } else {
+            ptrace::step(self.info.pid, None)?;
+            self.wait_child()
+        }
+    }
+    /// ブレークポイントで停止していた場合は
+    /// 1 ステップ実行しブレークポイントを再設定
+    fn step_and_break(mut self) -> Result<State, DynError> {
         todo!()
     }
+    /// ブレークポイントを実際に設定
+    /// つまり、該当アドレスのメモリを 0xcc(int 3) に設定
     fn set_break(&mut self) -> Result<(), DynError> {
         todo!()
     }
+    /// break を実行
     fn do_break(&mut self, cmd: &[&str]) -> Result<(), DynError> {
         if self.set_break_addr(cmd) {
             self.set_break()?;
         }
         Ok(())
     }
+    /// continue を実行
     fn do_continue(self) -> Result<State, DynError> {
+        todo!()
+    }
+    /// 子プロセスを wait 。子プロセスが終了した場合は NotRunning 状態に遷移
+    fn wait_child(self) -> Result<State, DynError> {
         todo!()
     }
     /// exit を実行。実行中のプロセスは kill
