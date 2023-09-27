@@ -174,7 +174,10 @@ impl ZDbg<Running> {
         todo!()
     }
     fn do_break(&mut self, cmd: &[&str]) -> Result<(), DynError> {
-        todo!()
+        if self.set_break_addr(cmd) {
+            self.set_break()?;
+        }
+        Ok(())
     }
     fn do_continue(self) -> Result<State, DynError> {
         todo!()
