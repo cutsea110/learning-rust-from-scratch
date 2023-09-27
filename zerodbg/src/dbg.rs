@@ -69,12 +69,88 @@ impl<T> ZDbg<T> {
 
 /// NotRunning 時に呼び出し可能なメソッド
 impl ZDbg<NotRunning> {
-    // TODO
+    pub fn new(filename: String) -> Self {
+        Self {
+            info: Box::new(DbgInfo {
+                pid: Pid::from_raw(0),
+                brk_addr: None,
+                brk_val: 0,
+                filename,
+            }),
+            _state: NotRunning,
+        }
+    }
+
+    pub fn do_cmd(mut self, cmd: &[&str]) -> Result<State, DynError> {
+        if cmd.is_empty() {
+            return Ok(State::NotRunning(self));
+        }
+
+        match cmd[0] {
+            "run" | "r" => return self.do_run(cmd),
+            "break" | "b" => {
+                self.do_break(cmd);
+            }
+            "exit" | "q" => return Ok(State::Exit),
+            "continue" | "c" | "stepi" | "s" | "registers" | "regs" => {
+                eprintln!("<<ターゲットを実行していません。 run で実行してください>>");
+            }
+            _ => self.do_cmd_common(cmd),
+        }
+
+        Ok(State::NotRunning(self))
+    }
+
+    /// ブレークポイントを設定
+    fn do_break(&mut self, cmd: &[&str]) -> bool {
+        self.set_break_addr(cmd)
+    }
+
+    /// 子プロセスを生成し、成功した場合は Running 状態に遷移
+    fn do_run(mut self, cmd: &[&str]) -> Result<State, DynError> {
+        // 子プロセスに渡すコマンドライン引数
+        let args: Vec<CString> = cmd.iter().map(|s| CString::new(*s).unwrap()).collect();
+
+        match unsafe { fork()? } {
+            ForkResult::Child => {
+                // ASLR の無効化
+                let p = personality::get().unwrap();
+                personality::set(p | Persona::ADDR_NO_RANDOMIZE).unwrap();
+                ptrace::traceme().unwrap();
+
+                // 子プロセスを実行
+                execvp(&CString::new(self.info.filename.as_str()).unwrap(), &args).unwrap();
+                unreachable!();
+            }
+            ForkResult::Parent { child } => match waitpid(child, None)? {
+                WaitStatus::Stopped(..) => {
+                    println!("<<子プロセスの実行に成功しました : PID = {child}>>");
+                    self.info.pid = child;
+                    let mut dbg = ZDbg::<Running> {
+                        info: self.info,
+                        _state: Running,
+                    };
+                    dbg.set_break()?; // ブレークポイントを設定
+                    dbg.do_continue()
+                }
+                WaitStatus::Exited(..) | WaitStatus::Signaled(..) => {
+                    Err("子プロセスの実行に失敗しました".into())
+                }
+                _ => Err("子プロセスが不正な状態です".into()),
+            },
+        }
+    }
 }
 
 /// Running 時に呼び出し可能なメソッド
 impl ZDbg<Running> {
     fn do_stepi(self) -> Result<State, DynError> {
+        todo!()
+    }
+    fn set_break(&mut self) -> Result<(), DynError> {
+        todo!()
+    }
+    fn do_continue(self) -> Result<State, DynError> {
         todo!()
     }
 }
