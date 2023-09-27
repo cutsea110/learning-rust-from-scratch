@@ -144,14 +144,50 @@ impl ZDbg<NotRunning> {
 
 /// Running 時に呼び出し可能なメソッド
 impl ZDbg<Running> {
+    pub fn do_cmd(mut self, cmd: &[&str]) -> Result<State, DynError> {
+        if cmd.is_empty() {
+            return Ok(State::Running(self));
+        }
+
+        match cmd[0] {
+            "break" | "b" => self.do_break(cmd)?,
+            "continue" | "c" => return self.do_continue(),
+            "registers" | "regs" => {
+                let regs = ptrace::getregs(self.info.pid)?;
+                print_regs(&regs);
+            }
+            "stepi" | "s" => return self.do_stepi(),
+            "run" | "r" => eprintln!("<<すでに実行中です>>"),
+            "exit" | "q" => {
+                self.do_exit()?;
+                return Ok(State::Exit);
+            }
+            _ => self.do_cmd_common(cmd),
+        }
+
+        Ok(State::Running(self))
+    }
     fn do_stepi(self) -> Result<State, DynError> {
         todo!()
     }
     fn set_break(&mut self) -> Result<(), DynError> {
         todo!()
     }
+    fn do_break(&mut self, cmd: &[&str]) -> Result<(), DynError> {
+        todo!()
+    }
     fn do_continue(self) -> Result<State, DynError> {
         todo!()
+    }
+    /// exit を実行。実行中のプロセスは kill
+    fn do_exit(self) -> Result<(), DynError> {
+        loop {
+            ptrace::kill(self.info.pid)?;
+            match waitpid(self.info.pid, None)? {
+                WaitStatus::Exited(..) | WaitStatus::Signaled(..) => return Ok(()),
+                _ => (),
+            }
+        }
     }
 }
 
@@ -191,4 +227,33 @@ fn get_break_addr(cmd: &[&str]) -> Option<*mut c_void> {
     } as *mut c_void;
 
     Some(addr)
+}
+
+/// レジスタを表示
+fn print_regs(regs: &user_regs_struct) {
+    println!(
+        r#"RIP: {:#016x}, RSP: {:#016x}, RBP: {:#016x}
+RAX: {:#016x}, RBX: {:#016x}, RCX: {:#016x}
+RDX: {:#016x}, RSI: {:#016x}, RDI: {:#016x}
+ R8: {:#016x},  R9: {:#016x}, R10: {:#016x}
+R11: {:#016x}, R12: {:#016x}, R13: {:#016x}
+R14: {:#016x}, R15: {:#016x}"#,
+        regs.rip,
+        regs.rsp,
+        regs.rbp,
+        regs.rax,
+        regs.rbx,
+        regs.rcx,
+        regs.rdx,
+        regs.rsi,
+        regs.rdi,
+        regs.r8,
+        regs.r9,
+        regs.r10,
+        regs.r11,
+        regs.r12,
+        regs.r13,
+        regs.r14,
+        regs.r15
+    );
 }
