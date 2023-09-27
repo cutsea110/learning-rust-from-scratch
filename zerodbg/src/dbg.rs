@@ -40,6 +40,14 @@ pub enum State {
 
 /// Running と NotRunning で共通の実装
 impl<T> ZDbg<T> {
+    /// 共通のコマンドを実行
+    fn do_cmd_common(&self, cmd: &[&str]) {
+        match cmd[0] {
+            "help" | "h" => do_help(),
+            _ => (),
+        }
+    }
+
     /// ブレークポイントのアドレスを設定する関数
     /// 子プロセスのメモリ上には反映しない
     /// アドレス設定に成功した場合は true を返す
