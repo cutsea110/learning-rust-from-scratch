@@ -205,7 +205,15 @@ impl ZDbg<Running> {
     }
     /// continue を実行
     fn do_continue(self) -> Result<State, DynError> {
-        todo!()
+        // ブレークポイントで停止していた場合は 1 ステップ実行後に再設定
+        match self.step_and_break()? {
+            State::Running(r) => {
+                // 実行再開
+                ptrace::cont(r.info.pid, None)?;
+                r.wait_child()
+            }
+            n => Ok(n),
+        }
     }
     /// 子プロセスを wait 。子プロセスが終了した場合は NotRunning 状態に遷移
     fn wait_child(self) -> Result<State, DynError> {
