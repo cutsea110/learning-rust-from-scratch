@@ -194,7 +194,51 @@ impl ZDbg<Running> {
     /// ブレークポイントを実際に設定
     /// つまり、該当アドレスのメモリを 0xcc(int 3) に設定
     fn set_break(&mut self) -> Result<(), DynError> {
-        todo!()
+        let addr = if let Some(addr) = self.info.brk_addr {
+            addr
+        } else {
+            return Ok(());
+        };
+
+        // ブレークするアドレスにあるメモリ上の値を取得
+        let val = match ptrace::read(self.info.pid, addr) {
+            Ok(val) => val,
+            Err(e) => {
+                eprintln!("<<ptrace::read に失敗 : {e}, addr = {addr:?}>>");
+                return Ok(());
+            }
+        };
+
+        // メモリ上の値を表示する補助関数
+        fn print_val(addr: usize, val: i64) {
+            print!("{addr:x}");
+            for n in (0..8).map(|n| ((val >> (n * 8)) & 0xff) as u8) {
+                print!(" {n:x}");
+            }
+        }
+
+        println!("<<以下のようにメモリを書き換えます>>");
+        print!("<<before: "); // 元の値を表示
+        print_val(addr as usize, val);
+        println!(">>");
+
+        let val_int3 = (val & !0xff) | 0xcc; // "int 3" に設定
+        print!("<<after: "); // 変更後の値を表示
+        print_val(addr as usize, val_int3);
+        println!(">>");
+
+        // "int 3" をメモリに書き込み
+        match unsafe { ptrace::write(self.info.pid, addr, val_int3 as *mut c_void) } {
+            Ok(_) => {
+                self.info.brk_addr = Some(addr);
+                self.info.brk_val = val; // 元の値を保持
+            }
+            Err(e) => {
+                eprintln!("<<ptrace::write に失敗 : {e}, addr = {addr:p}>>");
+            }
+        }
+
+        Ok(())
     }
     /// break を実行
     fn do_break(&mut self, cmd: &[&str]) -> Result<(), DynError> {
