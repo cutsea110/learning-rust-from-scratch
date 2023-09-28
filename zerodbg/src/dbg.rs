@@ -276,7 +276,37 @@ impl ZDbg<Running> {
     }
     /// 子プロセスを wait 。子プロセスが終了した場合は NotRunning 状態に遷移
     fn wait_child(self) -> Result<State, DynError> {
-        todo!()
+        match waitpid(self.info.pid, None)? {
+            WaitStatus::Exited(..) | WaitStatus::Signaled(..) => {
+                println!("<<子プロセスが終了しました>>");
+                let not_run = ZDbg::<NotRunning> {
+                    info: self.info,
+                    _state: NotRunning,
+                };
+                Ok(State::NotRunning(not_run))
+            }
+            WaitStatus::Stopped(..) => {
+                let mut regs = ptrace::getregs(self.info.pid)?;
+                if Some((regs.rip - 1) as *mut c_void) == self.info.brk_addr {
+                    // 書き換えたメモリを元の値に戻す
+                    unsafe {
+                        ptrace::write(
+                            self.info.pid,
+                            self.info.brk_addr.unwrap(),
+                            self.info.brk_val as *mut c_void,
+                        )?
+                    };
+
+                    // ブレークポイントで停止したアドレスから 1 つ戻す
+                    regs.rip -= 1;
+                    ptrace::setregs(self.info.pid, regs)?;
+                }
+                println!("<<子プロセスが停止しました : PC = {:#x}>>", regs.rip);
+
+                Ok(State::Running(self))
+            }
+            _ => Err("waitpid の返り値が不正です".into()),
+        }
     }
     /// exit を実行。実行中のプロセスは kill
     fn do_exit(self) -> Result<(), DynError> {
