@@ -189,7 +189,22 @@ impl ZDbg<Running> {
     /// ブレークポイントで停止していた場合は
     /// 1 ステップ実行しブレークポイントを再設定
     fn step_and_break(mut self) -> Result<State, DynError> {
-        todo!()
+        let regs = ptrace::getregs(self.info.pid)?;
+        if Some((regs.rip) as *mut c_void) == self.info.brk_addr {
+            ptrace::step(self.info.pid, None)?; // 1 ステップ実行
+            match waitpid(self.info.pid, None)? {
+                WaitStatus::Exited(..) | WaitStatus::Signaled(..) => {
+                    println!("<<子プロセスが終了しました>>");
+                    return Ok(State::NotRunning(ZDbg::<NotRunning> {
+                        info: self.info,
+                        _state: NotRunning,
+                    }));
+                }
+                _ => (),
+            }
+        }
+
+        Ok(State::Running(self))
     }
     /// ブレークポイントを実際に設定
     /// つまり、該当アドレスのメモリを 0xcc(int 3) に設定
