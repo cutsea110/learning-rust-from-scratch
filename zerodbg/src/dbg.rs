@@ -223,6 +223,7 @@ impl ZDbg<Running> {
         };
 
         // ブレークするアドレスにあるメモリ上の値を取得
+        // メモリの値は i64(8bytes) で返される
         let val = match ptrace::read(self.info.pid, addr) {
             Ok(val) => val,
             Err(e) => {
@@ -232,6 +233,7 @@ impl ZDbg<Running> {
         };
 
         // メモリ上の値を表示する補助関数
+        // read で得られた値と 0xcc で書き換えた値をわかりやすく表示する
         fn print_val(addr: usize, val: i64) {
             print!("{addr:x}");
             for n in (0..8).map(|n| ((val >> (n * 8)) & 0xff) as u8) {
@@ -244,12 +246,14 @@ impl ZDbg<Running> {
         print_val(addr as usize, val);
         println!(">>");
 
-        let val_int3 = (val & !0xff) | 0xcc; // "int 3" に設定
+        // "int 3" に設定する
+        let val_int3 = (val & !0xff) | 0xcc;
         print!("<<after: "); // 変更後の値を表示
         print_val(addr as usize, val_int3);
         println!(">>");
 
         // "int 3" をメモリに書き込み
+        // as *mut c_void と型変換しているのは、C の ptrace が引数にポインタをとるため
         match unsafe { ptrace::write(self.info.pid, addr, val_int3 as *mut c_void) } {
             Ok(_) => {
                 self.info.brk_addr = Some(addr);
