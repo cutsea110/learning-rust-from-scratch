@@ -114,8 +114,12 @@ impl ZDbg<NotRunning> {
         match unsafe { fork()? } {
             ForkResult::Child => {
                 // ASLR の無効化
+                // Linux ではセキュリティ上の理由から ASLR が有効になっている
+                // デバッグ時には不便なので無効化する
                 let p = personality::get().unwrap();
                 personality::set(p | Persona::ADDR_NO_RANDOMIZE).unwrap();
+                // 自身がデバッガによるトレース対象であることを指定
+                // traceme を指定した後は exec すると即座にプロセスが停止するようになる
                 ptrace::traceme().unwrap();
 
                 // 子プロセスを実行
@@ -123,6 +127,7 @@ impl ZDbg<NotRunning> {
                 unreachable!();
             }
             ForkResult::Parent { child } => match waitpid(child, None)? {
+                // 子プロセスで traceme しているので子プロセスは停止もしくは終了するはず
                 WaitStatus::Stopped(..) => {
                     println!("<<子プロセスの実行に成功しました : PID = {child}>>");
                     self.info.pid = child;
@@ -130,7 +135,9 @@ impl ZDbg<NotRunning> {
                         info: self.info,
                         _state: Running,
                     };
-                    dbg.set_break()?; // ブレークポイントを設定
+                    // ブレークポイントはプロセスの実行中にしか行えないのでこの時点で設定
+                    dbg.set_break()?;
+                    // 子プロセスの実行を再開
                     dbg.do_continue()
                 }
                 WaitStatus::Exited(..) | WaitStatus::Signaled(..) => {
