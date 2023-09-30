@@ -195,7 +195,7 @@ impl ZDbg<Running> {
     }
     /// ブレークポイントで停止していた場合は
     /// 1 ステップ実行しブレークポイントを再設定
-    fn step_and_break(self) -> Result<State, DynError> {
+    fn step_and_break(mut self) -> Result<State, DynError> {
         let regs = ptrace::getregs(self.info.pid)?;
         if Some((regs.rip) as *mut c_void) == self.info.brk_addr {
             ptrace::step(self.info.pid, None)?; // 1 ステップ実行
@@ -209,6 +209,7 @@ impl ZDbg<Running> {
                 }
                 _ => (),
             }
+            self.set_break()?; // ブレークポイントを再設定
         }
 
         Ok(State::Running(self))
