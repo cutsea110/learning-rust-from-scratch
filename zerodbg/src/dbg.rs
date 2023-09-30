@@ -248,7 +248,7 @@ impl ZDbg<Running> {
 
         // "int 3" に設定する
         let val_int3 = (val & !0xff) | 0xcc;
-        print!("<<after: "); // 変更後の値を表示
+        print!("<<after : "); // 変更後の値を表示
         print_val(addr as usize, val_int3);
         println!(">>");
 
