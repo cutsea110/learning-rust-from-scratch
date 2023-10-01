@@ -7,3 +7,11 @@ a shell implementation written in Rust.
 
 <img src="./zerosh/demo.gif" width="800" alt="Demo movie">
 [youtube]: https://www.youtube.com/watch?v=DqI9M_raCI4
+
+
+## zerodbg
+
+a debugger implementation written in Rust.
+
+<img src="./zerodbg/demo.gif" width="800" alt="Demo movie">
+[youtube]: https://www.youtube.com/watch?v=7OVzFflNoQo
