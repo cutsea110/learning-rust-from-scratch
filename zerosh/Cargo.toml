@@ -13,6 +13,8 @@ nix = "0.25"
 rustyline = "10.1"
 signal-hook = "0.3.17"
 
+parser-combinator = { path = "../parser-combinator", version = "0.1.0" }
+
 [profile.release]
 panic = "abort"
 

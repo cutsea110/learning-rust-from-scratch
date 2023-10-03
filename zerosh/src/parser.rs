@@ -18,10 +18,8 @@
 //! - [x] background "&"
 //! - [ ] semicolon ";"
 //!
-mod combinator;
-
 use crate::model::*;
-use combinator::*;
+use parser_combinator::*;
 
 /// tokenize command line
 fn tokenize(line: &str) -> Vec<(usize, String)> {

@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate log;
+extern crate parser_combinator;
 
 mod helper;
 mod model;

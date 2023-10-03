@@ -248,6 +248,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "parser-combinator"
+version = "0.1.0"
+
+[[package]]
 name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -578,6 +582,7 @@ dependencies = [
  "env_logger",
  "log",
  "nix",
+ "parser-combinator",
  "rustyline",
  "signal-hook",
 ]
