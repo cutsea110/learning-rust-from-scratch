@@ -2,7 +2,7 @@
 //!
 //! <Q> := lin | un
 //! <B> := true | false
-//! <V> := [a-zA-Z_][a-zA-Z0-9_]+
+//! <V> := [a-zA-Z_][a-zA-Z0-9_]*
 //! <E> := <V>
 //!      | <Q> <B>
 //!      | if <E> { <E> } else { <E> }
@@ -16,7 +16,7 @@
 //!      | (<T> -> <T>)
 //! <T> := <Q> <P>
 //! <Y> := epmty
-//!      | <Y>, <V> : <T>
+//!      | <Y> , <V> : <T>
 use crate::lang::*;
 use parser_combinator::*;
 
