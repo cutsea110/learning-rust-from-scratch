@@ -17,7 +17,8 @@
 //! <T> := <Q> <P>
 //! <Y> := epmty
 //!      | <Y>, <V> : <T>
-use parser_combinator;
+use crate::lang::*;
+use parser_combinator::*;
 
 /// tokenize program code
 fn tokenize(line: &str) -> Vec<(usize, String)> {
@@ -175,4 +176,19 @@ mod tokenize {
             ]
         );
     }
+}
+
+fn qual() -> impl Parser<Output = Qual> {
+    let lin = apply(literal("lin"), |_| Qual::Lin);
+    let un = apply(literal("un"), |_| Qual::Un);
+    altl(lin, un)
+}
+
+fn var() -> impl Parser<Output = String> {
+    satisfy(|s| {
+        let cs = s.chars().collect::<Vec<_>>();
+        cs.len() > 0
+            && (cs[0].is_alphabetic() || cs[0] == '_')
+            && cs[1..].iter().all(|c| c.is_alphanumeric() || *c == '_')
+    })
 }
