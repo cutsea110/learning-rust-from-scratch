@@ -1,7 +1,7 @@
 use std::fmt;
 
 /// 抽象構文木
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Let(LetExpr),
     If(IfExpr),
@@ -13,7 +13,7 @@ pub enum Expr {
 }
 
 /// let 式
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetExpr {
     pub var: String,
     pub ty: TypeExpr,
@@ -22,7 +22,7 @@ pub struct LetExpr {
 }
 
 /// if 式
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfExpr {
     pub cond_expr: Box<Expr>,
     pub then_expr: Box<Expr>,
@@ -30,7 +30,7 @@ pub struct IfExpr {
 }
 
 /// split 式
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SplitExpr {
     pub expr: Box<Expr>,
     pub left: String,
@@ -39,28 +39,28 @@ pub struct SplitExpr {
 }
 
 /// free 文
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FreeExpr {
     pub var: String,
     pub expr: Box<Expr>,
 }
 
 /// 関数適用
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AppExpr {
     pub expr1: Box<Expr>,
     pub expr2: Box<Expr>,
 }
 
 /// 修飾子付き値
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QValExpr {
     pub qual: Qual,
     pub val: ValExpr,
 }
 
 /// 値, 真偽値, 対, 関数(λ抽象)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ValExpr {
     Bool(bool),
     Pair(Box<Expr>, Box<Expr>),
@@ -75,7 +75,7 @@ pub enum Qual {
 }
 
 /// 関数
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FnExpr {
     pub var: String,
     pub ty: TypeExpr,

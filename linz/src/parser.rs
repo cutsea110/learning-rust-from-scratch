@@ -178,17 +178,31 @@ mod tokenize {
     }
 }
 
-fn qual() -> impl Parser<Output = Qual> {
+fn qual() -> impl Parser<Output = Qual> + Clone {
     let lin = apply(literal("lin"), |_| Qual::Lin);
     let un = apply(literal("un"), |_| Qual::Un);
     altl(lin, un)
 }
 
-fn var() -> impl Parser<Output = String> {
+fn var() -> impl Parser<Output = String> + Clone {
     satisfy(|s| {
         let cs = s.chars().collect::<Vec<_>>();
         cs.len() > 0
             && (cs[0].is_alphabetic() || cs[0] == '_')
             && cs[1..].iter().all(|c| c.is_alphanumeric() || *c == '_')
     })
+}
+
+fn expr() -> impl Parser<Output = Expr> + Clone {
+    // TODO
+    apply(var(), |v| Expr::Var(v))
+}
+
+fn prim_type() -> impl Parser<Output = PrimType> + Clone {
+    // TODO
+    apply(literal("bool"), |_| PrimType::Bool)
+}
+
+fn type_expr() -> impl Parser<Output = TypeExpr> + Clone {
+    apply2(qual(), prim_type(), |q, t| TypeExpr { qual: q, prim: t })
 }
