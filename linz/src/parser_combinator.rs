@@ -23,8 +23,8 @@ fn the_letter_a(input: &str) -> Result<(&str, ()), &str> {
     }
 }
 
-fn match_literal(expected: &'static str) -> impl Fn(&str) -> Result<(&str, ()), &str> {
-    move |input| match input.get(0..expected.len()) {
+fn match_literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
+    move |input: &'a str| match input.get(0..expected.len()) {
         Some(next) if next == expected => Ok((&input[expected.len()..], ())),
         _ => Err(input),
     }
@@ -36,16 +36,16 @@ mod match_literal {
     #[test]
     fn test() {
         let parse_joe = match_literal("Hello Joe!");
-        assert_eq!(Ok(("", ())), parse_joe("Hello Joe!"));
+        assert_eq!(Ok(("", ())), parse_joe.parse("Hello Joe!"));
         assert_eq!(
             Ok((" Hello Robert!", ())),
-            parse_joe("Hello Joe! Hello Robert!")
+            parse_joe.parse("Hello Joe! Hello Robert!")
         );
-        assert_eq!(Err("Hello Mike!"), parse_joe("Hello Mike!"));
+        assert_eq!(Err("Hello Mike!"), parse_joe.parse("Hello Mike!"));
     }
 }
 
-fn identifier(input: &str) -> Result<(&str, String), &str> {
+fn identifier(input: &str) -> ParseResult<String> {
     let mut matched = String::new();
     let mut chars = input.chars();
 
@@ -124,5 +124,36 @@ where
         parser
             .parse(input)
             .map(|(next_input, result)| (next_input, map_fn(result)))
+    }
+}
+
+fn left<'a, P1, P2, R1, R2>(parser1: P1, parser2: P2) -> impl Parser<'a, R1>
+where
+    P1: Parser<'a, R1>,
+    P2: Parser<'a, R2>,
+{
+    map(pair(parser1, parser2), |(left, _right)| left)
+}
+
+fn right<'a, P1, P2, R1, R2>(parser1: P1, parser2: P2) -> impl Parser<'a, R2>
+where
+    P1: Parser<'a, R1>,
+    P2: Parser<'a, R2>,
+{
+    map(pair(parser1, parser2), |(_left, right)| right)
+}
+#[cfg(test)]
+mod right {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let tag_opener = right(match_literal("<"), identifier);
+        assert_eq!(
+            Ok(("/>", "my-first-element".to_string())),
+            tag_opener.parse("<my-first-element/>")
+        );
+        assert_eq!(Err("oops"), tag_opener.parse("oops"));
+        assert_eq!(Err("!oops"), tag_opener.parse("<!oops"));
     }
 }
