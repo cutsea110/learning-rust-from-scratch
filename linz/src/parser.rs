@@ -1,3 +1,22 @@
+//! BNF
+//!
+//! <Q> := lin | un
+//! <B> := true | false
+//! <V> := [a-zA-Z_][a-zA-Z0-9_]+
+//! <E> := <V>
+//!      | <Q> <B>
+//!      | if <E> { <E> } else { <E> }
+//!      | <Q> fn <V> : <T> { <E> }
+//!      | (<E> <E>)
+//!      | <Q> <<E>, <E>>
+//!      | split <E> as <V>,<V> { <E> }
+//!      | free <V> ; <E>
+//! <P> := bool
+//!      | (<T> * <T>)
+//!      | (<T> -> <T>)
+//! <T> := <Q> <P>
+//! <Y> := epmty
+//!      | <Y>, <V> : <T>
 use parser_combinator;
 
 /// tokenize program code
