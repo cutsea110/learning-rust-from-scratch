@@ -157,3 +157,42 @@ mod right {
         assert_eq!(Err("!oops"), tag_opener.parse("<!oops"));
     }
 }
+
+fn one_or_more<'a, P, A>(parser: P) -> impl Parser<'a, Vec<A>>
+where
+    P: Parser<'a, A>,
+{
+    move |mut input| {
+        let mut result = Vec::new();
+
+        if let Ok((next_input, first_item)) = parser.parse(input) {
+            input = next_input;
+            result.push(first_item);
+        } else {
+            return Err(input);
+        }
+
+        while let Ok((next_input, next_item)) = parser.parse(input) {
+            input = next_input;
+            result.push(next_item);
+        }
+
+        Ok((input, result))
+    }
+}
+
+fn zero_or_more<'a, P, A>(parser: P) -> impl Parser<'a, Vec<A>>
+where
+    P: Parser<'a, A>,
+{
+    move |mut input| {
+        let mut result = Vec::new();
+
+        while let Ok((next_input, next_item)) = parser.parse(input) {
+            input = next_input;
+            result.push(next_item);
+        }
+
+        Ok((input, result))
+    }
+}
