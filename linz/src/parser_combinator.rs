@@ -2,7 +2,6 @@
 //!
 //! ref.) https://bodil.lol/parser-combinators/
 //!
-
 type ParseResult<'a, Output> = Result<(&'a str, Output), &'a str>;
 trait Parser<'a, Output> {
     fn parse(&self, input: &'a str) -> ParseResult<'a, Output>;
@@ -15,6 +14,61 @@ trait Parser<'a, Output> {
         F: Fn(Output) -> NewOutput + 'a,
     {
         BoxedParser::new(map(self, map_fn))
+    }
+
+    fn pred<F>(self, pred_fn: F) -> BoxedParser<'a, Output>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+        F: Fn(&Output) -> bool + 'a,
+    {
+        BoxedParser::new(pred(self, pred_fn))
+    }
+
+    fn join<Output2, F>(self, parser: F) -> BoxedParser<'a, (Output, Output2)>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+        Output2: 'a,
+        F: Parser<'a, Output2> + 'a,
+    {
+        BoxedParser::new(pair(self, parser))
+    }
+
+    fn skip<Output2, F>(self, parser: F) -> BoxedParser<'a, Output2>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+        Output2: 'a,
+        F: Parser<'a, Output2> + 'a,
+    {
+        BoxedParser::new(right(self, parser))
+    }
+
+    fn with<Output2, F>(self, parser: F) -> BoxedParser<'a, Output>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+        Output2: 'a,
+        F: Parser<'a, Output2> + 'a,
+    {
+        BoxedParser::new(left(self, parser))
+    }
+
+    fn many0(self) -> BoxedParser<'a, Vec<Output>>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+    {
+        BoxedParser::new(zero_or_more(self))
+    }
+
+    fn many1(self) -> BoxedParser<'a, Vec<Output>>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+    {
+        BoxedParser::new(one_or_more(self))
     }
 }
 impl<'a, F, Output> Parser<'a, Output> for F
@@ -284,14 +338,14 @@ mod pred {
 }
 
 fn whitespace_char<'a>() -> impl Parser<'a, char> {
-    pred(any_char, |c| c.is_whitespace())
+    any_char.pred(|c| c.is_whitespace())
 }
 
 fn space1<'a>() -> impl Parser<'a, Vec<char>> {
-    one_or_more(whitespace_char())
+    whitespace_char().many1()
 }
 fn space0<'a>() -> impl Parser<'a, Vec<char>> {
-    zero_or_more(whitespace_char())
+    whitespace_char().many0()
 }
 
 fn char<'a>(c: char) -> impl Parser<'a, char> {
@@ -320,25 +374,28 @@ mod char {
 
 fn bracket<'a, R1, R2, R3, P1, P2, P3>(parser1: P1, parser2: P2, parser3: P3) -> impl Parser<'a, R2>
 where
-    P1: Parser<'a, R1>,
-    P2: Parser<'a, R2>,
-    P3: Parser<'a, R3>,
+    R1: 'a,
+    R2: 'a,
+    R3: 'a,
+    P1: Parser<'a, R1> + 'a,
+    P2: Parser<'a, R2> + 'a,
+    P3: Parser<'a, R3> + 'a,
 {
-    right(parser1, left(parser2, parser3))
+    parser1.skip(parser2).with(parser3)
 }
 fn parens<'a, A, P>(parser: P) -> impl Parser<'a, A>
 where
-    P: Parser<'a, A>,
+    A: 'a,
+    P: Parser<'a, A> + 'a,
 {
     bracket(char('('), parser, char(')'))
 }
 
 fn double_quoted_string<'a>() -> impl Parser<'a, String> {
-    right(
-        char('"'),
-        left(zero_or_more(pred(any_char, |c| *c != '"')), char('"')),
-    )
-    .map(|chars| chars.into_iter().collect())
+    char('"')
+        .skip(any_char.pred(|c| *c != '"').many0())
+        .with(char('"'))
+        .map(|chars| chars.into_iter().collect())
 }
 #[cfg(test)]
 mod double_quoted_string {
@@ -354,13 +411,10 @@ mod double_quoted_string {
 }
 
 fn single_quoted_string<'a>() -> impl Parser<'a, String> {
-    map(
-        right(
-            char('\''),
-            left(zero_or_more(pred(any_char, |c| *c != '\'')), char('\'')),
-        ),
-        |chars| chars.into_iter().collect(),
-    )
+    char('\'')
+        .skip(any_char.pred(|c| *c != '\'').many0())
+        .with(char('\''))
+        .map(|chars| chars.into_iter().collect())
 }
 #[cfg(test)]
 mod single_quoted_string {
