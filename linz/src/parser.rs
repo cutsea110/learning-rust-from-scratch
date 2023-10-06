@@ -20,6 +20,28 @@
 use crate::lang::*;
 use crate::parser_combinator::*;
 
+fn infix_pair<'a, P1, P2, Sep, R1, R2, O>(
+    parser1: P1,
+    sep: Sep,
+    parser2: P2,
+) -> impl Parser<'a, (R1, R2)>
+where
+    P1: Parser<'a, R1>,
+    P2: Parser<'a, R2>,
+    Sep: Parser<'a, O>,
+{
+    move |input| match parser1.parse(input) {
+        Ok((next_input, result1)) => match sep.parse(next_input) {
+            Ok((next_input, _)) => match parser2.parse(next_input) {
+                Ok((final_input, result2)) => Ok((final_input, (result1, result2))),
+                Err(e) => Err(e),
+            },
+            Err(e) => Err(e),
+        },
+        Err(e) => Err(e),
+    }
+}
+
 fn qual<'a>() -> impl Parser<'a, Qual> {
     let lin = literal("lin").map(|_| Qual::Lin);
     let un = literal("un").map(|_| Qual::Un);
@@ -60,9 +82,9 @@ fn expr<'a>() -> impl Parser<'a, Expr> {
         .map(|(q, b)| Expr::QVal(QValExpr { qual: q, val: b }));
     let if_expr = literal("if")
         .skip(expr())
-        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
+        .join(braces(expr()))
         .with(literal("else"))
-        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
+        .join(braces(expr()))
         .map(|((c, t), e)| {
             Expr::If(IfExpr {
                 cond_expr: Box::new(c),
@@ -72,11 +94,9 @@ fn expr<'a>() -> impl Parser<'a, Expr> {
         });
     let fn_expr = qual()
         .with(lexeme(literal("fn")))
-        .join(variable)
-        .with(lexeme(char(':')))
-        .join(type_expr())
-        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
-        .map(|(((q, v), t), e)| {
+        .join(infix_pair(variable, lexeme(char(':')), type_expr()))
+        .join(braces(expr()))
+        .map(|((q, (v, t)), e)| {
             Expr::QVal(QValExpr {
                 qual: q,
                 val: ValExpr::Fun(FnExpr {
@@ -93,11 +113,7 @@ fn expr<'a>() -> impl Parser<'a, Expr> {
         })
     });
     let tuple = qual()
-        .join(bracket(
-            lexeme(char('<')),
-            expr().with(lexeme(char(','))).join(expr()),
-            lexeme(char('>')),
-        ))
+        .join(angles(infix_pair(expr(), lexeme(char(',')), expr())))
         .map(|(q, (e1, e2))| {
             Expr::QVal(QValExpr {
                 qual: q,
@@ -107,8 +123,8 @@ fn expr<'a>() -> impl Parser<'a, Expr> {
     let split_expr = literal("split")
         .skip(expr())
         .with(literal("as"))
-        .join(variable.with(lexeme(char(','))).join(variable))
-        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
+        .join(infix_pair(variable, lexeme(char(',')), variable))
+        .join(braces(expr()))
         .map(|((e, (v1, v2)), e1)| {
             Expr::Split(SplitExpr {
                 expr: Box::new(e),
@@ -118,9 +134,7 @@ fn expr<'a>() -> impl Parser<'a, Expr> {
             })
         });
     let free_stmt = literal("free")
-        .skip(variable)
-        .with(lexeme(char(';')))
-        .join(expr())
+        .skip(infix_pair(variable, lexeme(char(';')), expr()))
         .map(|(v, e)| {
             Expr::Free(FreeExpr {
                 var: v,
@@ -139,9 +153,9 @@ fn expr<'a>() -> impl Parser<'a, Expr> {
 
 fn prim_type<'a>() -> impl Parser<'a, PrimType> {
     let bool = lexeme(literal("bool")).map(|_| PrimType::Bool);
-    let tuple = parens(type_expr().with(lexeme(char('*'))).join(type_expr()))
+    let tuple = parens(infix_pair(type_expr(), lexeme(char('*')), type_expr()))
         .map(|(t1, t2)| PrimType::Pair(Box::new(t1), Box::new(t2)));
-    let arrow = parens(type_expr().with(lexeme(literal("->"))).join(type_expr()))
+    let arrow = parens(infix_pair(type_expr(), lexeme(literal("->")), type_expr()))
         .map(|(t1, t2)| PrimType::Arrow(Box::new(t1), Box::new(t2)));
 
     bool.or_else(tuple).or_else(arrow)
