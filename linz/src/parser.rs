@@ -64,7 +64,7 @@ fn variable(input: &str) -> ParseResult<String> {
     }
 
     while let Some(next) = chars.next() {
-        if next.is_alphabetic() || next == '_' {
+        if next.is_alphanumeric() || next == '_' {
             matched.push(next);
         } else {
             break;
