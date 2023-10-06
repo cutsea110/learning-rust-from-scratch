@@ -90,6 +90,16 @@ trait Parser<'a, Output> {
     {
         BoxedParser::new(bind(self, f))
     }
+
+    fn sep_by<SepOutput, F>(self, sep: F) -> BoxedParser<'a, Vec<Output>>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+        SepOutput: 'a,
+        F: Parser<'a, SepOutput> + 'a,
+    {
+        BoxedParser::new(sep_by(self, sep))
+    }
 }
 impl<'a, F, Output> Parser<'a, Output> for F
 where
@@ -462,5 +472,46 @@ where
     move |input| match parser.parse(input) {
         Ok((next_input, result)) => f(result).parse(next_input),
         Err(e) => Err(e),
+    }
+}
+
+fn sep_by<'a, A, B, P, Q>(parser: P, sep: Q) -> impl Parser<'a, Vec<A>>
+where
+    A: 'a,
+    B: 'a,
+    P: Parser<'a, A> + 'a,
+    Q: Parser<'a, B> + 'a,
+{
+    move |mut input| {
+        if let Ok((next_input, first_item)) = parser.parse(input) {
+            input = next_input;
+            let mut result = vec![first_item];
+
+            while let Ok((next_input, _)) = sep.parse(input) {
+                input = next_input;
+                if let Ok((next_input, next_item)) = parser.parse(input) {
+                    input = next_input;
+                    result.push(next_item);
+                } else {
+                    break;
+                }
+            }
+
+            Ok((input, result))
+        } else {
+            Err(input)
+        }
+    }
+}
+#[cfg(test)]
+mod sep_by {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = sep_by(any_char, char(','));
+        assert_eq!(Ok(("", vec!['a', 'b', 'c'])), parser.parse("a,b,c"));
+        assert_eq!(Ok(("", vec!['a'])), parser.parse("a"));
+        assert_eq!(Err(("")), parser.parse(""));
     }
 }
