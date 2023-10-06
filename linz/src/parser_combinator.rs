@@ -180,6 +180,18 @@ where
         Ok((input, result))
     }
 }
+#[cfg(test)]
+mod one_or_more {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = one_or_more(match_literal("ha"));
+        assert_eq!(Ok(("", vec![(), (), ()])), parser.parse("hahaha"));
+        assert_eq!(Err("ahah"), parser.parse("ahah"));
+        assert_eq!(Err(""), parser.parse(""));
+    }
+}
 
 fn zero_or_more<'a, P, A>(parser: P) -> impl Parser<'a, Vec<A>>
 where
@@ -194,5 +206,17 @@ where
         }
 
         Ok((input, result))
+    }
+}
+#[cfg(test)]
+mod zero_or_more {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = zero_or_more(match_literal("ha"));
+        assert_eq!(Ok(("", vec![(), (), ()])), parser.parse("hahaha"));
+        assert_eq!(Ok(("ahah", vec![])), parser.parse("ahah"));
+        assert_eq!(Ok(("", vec![])), parser.parse(""));
     }
 }
