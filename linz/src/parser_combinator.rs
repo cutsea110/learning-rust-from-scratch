@@ -220,3 +220,93 @@ mod zero_or_more {
         assert_eq!(Ok(("", vec![])), parser.parse(""));
     }
 }
+
+fn any_char(input: &str) -> ParseResult<char> {
+    match input.chars().next() {
+        Some(next) => Ok((&input[next.len_utf8()..], next)),
+        _ => Err(input),
+    }
+}
+fn pred<'a, P, A, F>(parser: P, predicate: F) -> impl Parser<'a, A>
+where
+    P: Parser<'a, A>,
+    F: Fn(&A) -> bool,
+{
+    move |input| {
+        if let Ok((next_input, value)) = parser.parse(input) {
+            if predicate(&value) {
+                return Ok((next_input, value));
+            }
+        }
+
+        Err(input)
+    }
+}
+#[cfg(test)]
+mod pred {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = pred(any_char, |c| *c == 'o');
+        assert_eq!(Ok(("mg", 'o')), parser.parse("omg"));
+        assert_eq!(Err("lol"), parser.parse("lol"));
+    }
+}
+
+fn whitespace_char<'a>() -> impl Parser<'a, char> {
+    pred(any_char, |c| c.is_whitespace())
+}
+
+fn space1<'a>() -> impl Parser<'a, Vec<char>> {
+    one_or_more(whitespace_char())
+}
+fn space0<'a>() -> impl Parser<'a, Vec<char>> {
+    zero_or_more(whitespace_char())
+}
+
+fn char<'a>(c: char) -> impl Parser<'a, char> {
+    move |input: &'a str| {
+        if let Some(next_ch) = input.chars().next() {
+            if next_ch == c {
+                return Ok((&input[next_ch.len_utf8()..], next_ch));
+            }
+            return Err(input);
+        }
+
+        Err(input)
+    }
+}
+#[cfg(test)]
+mod char {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = char('h');
+        assert_eq!(Ok(("ello", 'h')), parser.parse("hello"));
+        assert_eq!(Err("Hello"), parser.parse("Hello"));
+    }
+}
+
+fn quoted_string<'a>() -> impl Parser<'a, String> {
+    map(
+        right(
+            char('"'),
+            left(zero_or_more(pred(any_char, |c| *c != '"')), char('"')),
+        ),
+        |chars| chars.into_iter().collect(),
+    )
+}
+#[cfg(test)]
+mod quoted_string {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            Ok(("", "Hello Joe!".to_string())),
+            quoted_string().parse("\"Hello Joe!\"")
+        );
+    }
+}
