@@ -70,6 +70,26 @@ trait Parser<'a, Output> {
     {
         BoxedParser::new(one_or_more(self))
     }
+
+    fn or_else<F>(self, f: F) -> BoxedParser<'a, Output>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+        F: Parser<'a, Output> + 'a,
+    {
+        BoxedParser::new(altl(self, f))
+    }
+
+    fn and_then<F, NextParser, NewOutput>(self, f: F) -> BoxedParser<'a, NewOutput>
+    where
+        Self: Sized + 'a,
+        Output: 'a,
+        NewOutput: 'a,
+        NextParser: Parser<'a, NewOutput> + 'a,
+        F: Fn(Output) -> NextParser + 'a,
+    {
+        BoxedParser::new(bind(self, f))
+    }
 }
 impl<'a, F, Output> Parser<'a, Output> for F
 where
@@ -99,26 +119,19 @@ impl<'a, Output> Parser<'a, Output> for BoxedParser<'a, Output> {
     }
 }
 
-fn the_letter_a(input: &str) -> Result<(&str, ()), &str> {
-    match input.chars().next() {
-        Some('a') => Ok((&input['a'.len_utf8()..], ())),
-        _ => Err(input),
-    }
-}
-
-fn match_literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
+fn literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
     move |input: &'a str| match input.get(0..expected.len()) {
         Some(next) if next == expected => Ok((&input[expected.len()..], ())),
         _ => Err(input),
     }
 }
 #[cfg(test)]
-mod match_literal {
+mod literal {
     use super::*;
 
     #[test]
     fn test() {
-        let parse_joe = match_literal("Hello Joe!");
+        let parse_joe = literal("Hello Joe!");
         assert_eq!(Ok(("", ())), parse_joe.parse("Hello Joe!"));
         assert_eq!(
             Ok((" Hello Robert!", ())),
@@ -188,7 +201,7 @@ mod pair {
 
     #[test]
     fn test() {
-        let tag_opener = pair(match_literal("<"), identifier);
+        let tag_opener = pair(literal("<"), identifier);
         assert_eq!(
             Ok(("/>", ((), "my-first-element".to_string()))),
             tag_opener.parse("<my-first-element/>")
@@ -231,7 +244,7 @@ mod right {
 
     #[test]
     fn test() {
-        let tag_opener = right(match_literal("<"), identifier);
+        let tag_opener = right(literal("<"), identifier);
         assert_eq!(
             Ok(("/>", "my-first-element".to_string())),
             tag_opener.parse("<my-first-element/>")
@@ -269,7 +282,7 @@ mod one_or_more {
 
     #[test]
     fn test() {
-        let parser = one_or_more(match_literal("ha"));
+        let parser = one_or_more(literal("ha"));
         assert_eq!(Ok(("", vec![(), (), ()])), parser.parse("hahaha"));
         assert_eq!(Err("ahah"), parser.parse("ahah"));
         assert_eq!(Err(""), parser.parse(""));
@@ -297,7 +310,7 @@ mod zero_or_more {
 
     #[test]
     fn test() {
-        let parser = zero_or_more(match_literal("ha"));
+        let parser = zero_or_more(literal("ha"));
         assert_eq!(Ok(("", vec![(), (), ()])), parser.parse("hahaha"));
         assert_eq!(Ok(("ahah", vec![])), parser.parse("ahah"));
         assert_eq!(Ok(("", vec![])), parser.parse(""));
@@ -426,5 +439,28 @@ mod single_quoted_string {
             Ok(("", "Hello Joe!".to_string())),
             single_quoted_string().parse("'Hello Joe!'")
         );
+    }
+}
+
+fn altl<'a, P1, P2, A>(parser1: P1, parser2: P2) -> impl Parser<'a, A>
+where
+    P1: Parser<'a, A>,
+    P2: Parser<'a, A>,
+{
+    move |input| match parser1.parse(input) {
+        ok @ Ok(_) => ok,
+        Err(_) => parser2.parse(input),
+    }
+}
+
+fn bind<'a, P, F, A, B, NextP>(parser: P, f: F) -> impl Parser<'a, B>
+where
+    P: Parser<'a, A>,
+    NextP: Parser<'a, B>,
+    F: Fn(A) -> NextP,
+{
+    move |input| match parser.parse(input) {
+        Ok((next_input, result)) => f(result).parse(next_input),
+        Err(e) => Err(e),
     }
 }
