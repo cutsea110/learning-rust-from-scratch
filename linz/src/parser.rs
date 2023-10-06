@@ -75,72 +75,84 @@ fn variable(input: &str) -> ParseResult<String> {
     Ok((&input[next_index..], matched))
 }
 
+fn if_expr<'a>() -> impl Parser<'a, IfExpr> {
+    literal("if")
+        .skip(expr())
+        .join(braces(expr()))
+        .with(lexeme(literal("else")))
+        .join(braces(expr()))
+        .map(|((c, t), e)| IfExpr {
+            cond_expr: Box::new(c),
+            then_expr: Box::new(t),
+            else_expr: Box::new(e),
+        })
+}
+
+fn fn_expr<'a>() -> impl Parser<'a, QValExpr> {
+    qual()
+        .with(lexeme(literal("fn")))
+        .join(infix_pair(variable, lexeme(char(':')), type_expr()))
+        .join(braces(expr()))
+        .map(|((q, (v, t)), e)| QValExpr {
+            qual: q,
+            val: ValExpr::Fun(FnExpr {
+                var: v,
+                ty: t,
+                expr: Box::new(e),
+            }),
+        })
+}
+
+fn app_expr<'a>() -> impl Parser<'a, AppExpr> {
+    parens(expr().join(expr())).map(|(e1, e2)| AppExpr {
+        expr1: Box::new(e1),
+        expr2: Box::new(e2),
+    })
+}
+
+fn tuple_expr<'a>() -> impl Parser<'a, QValExpr> {
+    qual()
+        .join(angles(infix_pair(expr(), lexeme(char(',')), expr())))
+        .map(|(q, (e1, e2))| QValExpr {
+            qual: q,
+            val: ValExpr::Pair(Box::new(e1), Box::new(e2)),
+        })
+}
+
+fn split_expr<'a>() -> impl Parser<'a, SplitExpr> {
+    literal("split")
+        .skip(expr())
+        .with(literal("as"))
+        .join(infix_pair(variable, lexeme(char(',')), variable))
+        .join(braces(expr()))
+        .map(|((e, (v1, v2)), e1)| SplitExpr {
+            expr: Box::new(e),
+            left: v1,
+            right: v2,
+            body: Box::new(e1),
+        })
+}
+
+fn free_stmt<'a>() -> impl Parser<'a, FreeExpr> {
+    literal("free")
+        .skip(infix_pair(variable, lexeme(char(';')), expr()))
+        .map(|(v, e)| FreeExpr {
+            var: v,
+            expr: Box::new(e),
+        })
+}
+
 fn expr<'a>() -> impl Parser<'a, Expr> {
     let var = variable.map(|s| Expr::Var(s));
     let qbool = qual()
         .join(bool())
         .map(|(q, b)| Expr::QVal(QValExpr { qual: q, val: b }));
-    let if_expr = literal("if")
-        .skip(expr())
-        .join(braces(expr()))
-        .with(literal("else"))
-        .join(braces(expr()))
-        .map(|((c, t), e)| {
-            Expr::If(IfExpr {
-                cond_expr: Box::new(c),
-                then_expr: Box::new(t),
-                else_expr: Box::new(e),
-            })
-        });
-    let fn_expr = qual()
-        .with(lexeme(literal("fn")))
-        .join(infix_pair(variable, lexeme(char(':')), type_expr()))
-        .join(braces(expr()))
-        .map(|((q, (v, t)), e)| {
-            Expr::QVal(QValExpr {
-                qual: q,
-                val: ValExpr::Fun(FnExpr {
-                    var: v,
-                    ty: t,
-                    expr: Box::new(e),
-                }),
-            })
-        });
-    let app = parens(expr().join(expr())).map(|(e1, e2)| {
-        Expr::App(AppExpr {
-            expr1: Box::new(e1),
-            expr2: Box::new(e2),
-        })
-    });
-    let tuple = qual()
-        .join(angles(infix_pair(expr(), lexeme(char(',')), expr())))
-        .map(|(q, (e1, e2))| {
-            Expr::QVal(QValExpr {
-                qual: q,
-                val: ValExpr::Pair(Box::new(e1), Box::new(e2)),
-            })
-        });
-    let split_expr = literal("split")
-        .skip(expr())
-        .with(literal("as"))
-        .join(infix_pair(variable, lexeme(char(',')), variable))
-        .join(braces(expr()))
-        .map(|((e, (v1, v2)), e1)| {
-            Expr::Split(SplitExpr {
-                expr: Box::new(e),
-                left: v1,
-                right: v2,
-                body: Box::new(e1),
-            })
-        });
-    let free_stmt = literal("free")
-        .skip(infix_pair(variable, lexeme(char(';')), expr()))
-        .map(|(v, e)| {
-            Expr::Free(FreeExpr {
-                var: v,
-                expr: Box::new(e),
-            })
-        });
+    let if_expr = if_expr().map(|e| Expr::If(e));
+    let fn_expr = fn_expr().map(|e| Expr::QVal(e));
+    let app = app_expr().map(|e| Expr::App(e));
+    let tuple = tuple_expr().map(|e| Expr::QVal(e));
+    let split_expr = split_expr().map(|e| Expr::Split(e));
+    let free_stmt = free_stmt().map(|e| Expr::Free(e));
 
     var.or_else(qbool)
         .or_else(if_expr)
