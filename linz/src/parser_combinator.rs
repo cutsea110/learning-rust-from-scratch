@@ -532,6 +532,7 @@ mod lexeme {
         let parser = lexeme(char('a'));
         assert_eq!(Ok(("", 'a')), parser.parse(" a"));
         assert_eq!(Ok(("", 'a')), parser.parse("a"));
+        assert_eq!(Err("b"), parser.parse(" b"));
         assert_eq!(Err("b"), parser.parse("b"));
     }
 }
