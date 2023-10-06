@@ -1,7 +1,7 @@
 use std::fmt;
 
 /// 抽象構文木
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Let(LetExpr),
     If(IfExpr),
@@ -13,7 +13,7 @@ pub enum Expr {
 }
 
 /// let 式
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LetExpr {
     pub var: String,
     pub ty: TypeExpr,
@@ -22,7 +22,7 @@ pub struct LetExpr {
 }
 
 /// if 式
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IfExpr {
     pub cond_expr: Box<Expr>,
     pub then_expr: Box<Expr>,
@@ -30,7 +30,7 @@ pub struct IfExpr {
 }
 
 /// split 式
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SplitExpr {
     pub expr: Box<Expr>,
     pub left: String,
@@ -39,28 +39,28 @@ pub struct SplitExpr {
 }
 
 /// free 文
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FreeExpr {
     pub var: String,
     pub expr: Box<Expr>,
 }
 
 /// 関数適用
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AppExpr {
     pub expr1: Box<Expr>,
     pub expr2: Box<Expr>,
 }
 
 /// 修飾子付き値
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct QValExpr {
     pub qual: Qual,
     pub val: ValExpr,
 }
 
 /// 値, 真偽値, 対, 関数(λ抽象)
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ValExpr {
     Bool(bool),
     Pair(Box<Expr>, Box<Expr>),
@@ -68,14 +68,14 @@ pub enum ValExpr {
 }
 
 /// 修飾子
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Qual {
     Lin, // 線形型
     Un,  // 制約のない一般的な型
 }
 
 /// 関数
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FnExpr {
     pub var: String,
     pub ty: TypeExpr,
@@ -83,7 +83,7 @@ pub struct FnExpr {
 }
 
 /// 修飾子付き型
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TypeExpr {
     pub qual: Qual,
     pub prim: PrimType,
@@ -98,7 +98,7 @@ impl fmt::Display for TypeExpr {
 }
 
 /// プリミティブ型
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PrimType {
     Bool,
     Pair(Box<TypeExpr>, Box<TypeExpr>),

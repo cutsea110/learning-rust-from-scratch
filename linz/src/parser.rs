@@ -47,11 +47,37 @@ fn qual<'a>() -> impl Parser<'a, Qual> {
     let un = literal("un").map(|_| Qual::Un);
     lexeme(lin.or_else(un))
 }
+#[cfg(test)]
+mod qual_test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(qual().parse("lin"), Ok(("", Qual::Lin)));
+        assert_eq!(qual().parse(" lin"), Ok(("", Qual::Lin)));
+        assert_eq!(qual().parse("un"), Ok(("", Qual::Un)));
+        assert_eq!(qual().parse(" un"), Ok(("", Qual::Un)));
+        assert_eq!(qual().parse("foo"), Err("foo"));
+    }
+}
 
 fn bool<'a>() -> impl Parser<'a, ValExpr> {
     let t = literal("true").map(|_| ValExpr::Bool(true));
     let f = literal("false").map(|_| ValExpr::Bool(false));
     lexeme(t.or_else(f))
+}
+#[cfg(test)]
+mod bool_test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(bool().parse("true"), Ok(("", ValExpr::Bool(true))));
+        assert_eq!(bool().parse(" true"), Ok(("", ValExpr::Bool(true))));
+        assert_eq!(bool().parse("false"), Ok(("", ValExpr::Bool(false))));
+        assert_eq!(bool().parse(" false"), Ok(("", ValExpr::Bool(false))));
+        assert_eq!(bool().parse("foo"), Err("foo"));
+    }
 }
 
 fn variable(input: &str) -> ParseResult<String> {
@@ -74,6 +100,73 @@ fn variable(input: &str) -> ParseResult<String> {
     let next_index = matched.len();
     Ok((&input[next_index..], matched))
 }
+#[cfg(test)]
+mod variable_test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(variable("foo"), Ok(("", "foo".to_string())));
+        assert_eq!(variable("foo_bar"), Ok(("", "foo_bar".to_string())));
+        assert_eq!(variable("foo1"), Ok(("", "foo1".to_string())));
+        assert_eq!(variable("1foo"), Err("1foo"));
+    }
+}
+
+fn qual_bool<'a>() -> impl Parser<'a, QValExpr> {
+    qual()
+        .join(bool())
+        .map(|(q, b)| QValExpr { qual: q, val: b })
+}
+#[cfg(test)]
+mod qual_bool_test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            qual_bool().parse("lin true"),
+            Ok((
+                "",
+                QValExpr {
+                    qual: Qual::Lin,
+                    val: ValExpr::Bool(true)
+                }
+            ))
+        );
+        assert_eq!(
+            qual_bool().parse(" lin  true"),
+            Ok((
+                "",
+                QValExpr {
+                    qual: Qual::Lin,
+                    val: ValExpr::Bool(true)
+                }
+            ))
+        );
+        assert_eq!(
+            qual_bool().parse("un false"),
+            Ok((
+                "",
+                QValExpr {
+                    qual: Qual::Un,
+                    val: ValExpr::Bool(false)
+                }
+            ))
+        );
+        assert_eq!(
+            qual_bool().parse(" un  false"),
+            Ok((
+                "",
+                QValExpr {
+                    qual: Qual::Un,
+                    val: ValExpr::Bool(false)
+                }
+            ))
+        );
+        assert_eq!(qual_bool().parse("foo"), Err("foo"));
+    }
+}
 
 fn if_expr<'a>() -> impl Parser<'a, IfExpr> {
     literal("if")
@@ -86,6 +179,18 @@ fn if_expr<'a>() -> impl Parser<'a, IfExpr> {
             then_expr: Box::new(t),
             else_expr: Box::new(e),
         })
+}
+#[cfg(test)]
+mod if_expr_test {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(
+            if_expr().parse("if lin true { un false } else { lin true }"),
+            Err("")
+        );
+    }
 }
 
 fn fn_expr<'a>() -> impl Parser<'a, QValExpr> {
@@ -102,12 +207,74 @@ fn fn_expr<'a>() -> impl Parser<'a, QValExpr> {
             }),
         })
 }
+#[cfg(test)]
+mod fn_expr_test {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(
+            fn_expr().parse("lin fn foo: un bool { un false }"),
+            Ok((
+                "",
+                QValExpr {
+                    qual: Qual::Lin,
+                    val: ValExpr::Fun(FnExpr {
+                        var: "foo".to_string(),
+                        ty: TypeExpr {
+                            qual: Qual::Un,
+                            prim: PrimType::Bool
+                        },
+                        expr: Box::new(Expr::QVal(QValExpr {
+                            qual: Qual::Un,
+                            val: ValExpr::Bool(false)
+                        }))
+                    })
+                }
+            ))
+        );
+    }
+}
 
 fn app_expr<'a>() -> impl Parser<'a, AppExpr> {
     parens(expr().join(expr())).map(|(e1, e2)| AppExpr {
         expr1: Box::new(e1),
         expr2: Box::new(e2),
     })
+}
+#[cfg(test)]
+mod app_expr_test {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(
+            app_expr().parse("(lin fn foo: un bool { un false }) (un true)"),
+            Ok((
+                "",
+                AppExpr {
+                    expr1: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Fun(FnExpr {
+                            var: "foo".to_string(),
+                            ty: TypeExpr {
+                                qual: Qual::Un,
+                                prim: PrimType::Bool
+                            },
+                            expr: Box::new(Expr::QVal(QValExpr {
+                                qual: Qual::Un,
+                                val: ValExpr::Bool(false)
+                            }))
+                        })
+                    })),
+                    expr2: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Un,
+                        val: ValExpr::Bool(true)
+                    }))
+                }
+            ))
+        );
+    }
 }
 
 fn tuple_expr<'a>() -> impl Parser<'a, QValExpr> {
@@ -117,6 +284,33 @@ fn tuple_expr<'a>() -> impl Parser<'a, QValExpr> {
             qual: q,
             val: ValExpr::Pair(Box::new(e1), Box::new(e2)),
         })
+}
+#[cfg(test)]
+mod tuple_expr_test {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(
+            tuple_expr().parse("lin <un true, lin false>"),
+            Ok((
+                "",
+                QValExpr {
+                    qual: Qual::Lin,
+                    val: ValExpr::Pair(
+                        Box::new(Expr::QVal(QValExpr {
+                            qual: Qual::Un,
+                            val: ValExpr::Bool(true)
+                        })),
+                        Box::new(Expr::QVal(QValExpr {
+                            qual: Qual::Lin,
+                            val: ValExpr::Bool(false)
+                        }))
+                    )
+                }
+            ))
+        );
+    }
 }
 
 fn split_expr<'a>() -> impl Parser<'a, SplitExpr> {
@@ -132,6 +326,41 @@ fn split_expr<'a>() -> impl Parser<'a, SplitExpr> {
             body: Box::new(e1),
         })
 }
+#[cfg(test)]
+mod split_expr_test {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(
+            split_expr().parse("split lin <un true, lin false> as foo, bar { un false }"),
+            Ok((
+                "",
+                SplitExpr {
+                    expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Pair(
+                            Box::new(Expr::QVal(QValExpr {
+                                qual: Qual::Un,
+                                val: ValExpr::Bool(true)
+                            })),
+                            Box::new(Expr::QVal(QValExpr {
+                                qual: Qual::Lin,
+                                val: ValExpr::Bool(false)
+                            }))
+                        )
+                    })),
+                    left: "foo".to_string(),
+                    right: "bar".to_string(),
+                    body: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Un,
+                        val: ValExpr::Bool(false)
+                    }))
+                }
+            ))
+        );
+    }
+}
 
 fn free_stmt<'a>() -> impl Parser<'a, FreeExpr> {
     literal("free")
@@ -141,12 +370,31 @@ fn free_stmt<'a>() -> impl Parser<'a, FreeExpr> {
             expr: Box::new(e),
         })
 }
+#[cfg(test)]
+mod free_stmt_test {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(
+            free_stmt().parse("free foo; un false"),
+            Ok((
+                "",
+                FreeExpr {
+                    var: "foo".to_string(),
+                    expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Un,
+                        val: ValExpr::Bool(false)
+                    }))
+                }
+            ))
+        );
+    }
+}
 
 fn expr<'a>() -> impl Parser<'a, Expr> {
     let var = variable.map(|s| Expr::Var(s));
-    let qbool = qual()
-        .join(bool())
-        .map(|(q, b)| Expr::QVal(QValExpr { qual: q, val: b }));
+    let qbool = qual_bool().map(|e| Expr::QVal(e));
     let if_expr = if_expr().map(|e| Expr::If(e));
     let fn_expr = fn_expr().map(|e| Expr::QVal(e));
     let app = app_expr().map(|e| Expr::App(e));
@@ -172,9 +420,68 @@ fn prim_type<'a>() -> impl Parser<'a, PrimType> {
 
     bool.or_else(tuple).or_else(arrow)
 }
+#[cfg(test)]
+mod prim_type {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(prim_type().parse("bool"), Ok(("", PrimType::Bool)));
+        assert_eq!(
+            prim_type().parse("(un bool * lin bool)"),
+            Ok((
+                "",
+                PrimType::Pair(
+                    Box::new(TypeExpr {
+                        qual: Qual::Un,
+                        prim: PrimType::Bool
+                    }),
+                    Box::new(TypeExpr {
+                        qual: Qual::Lin,
+                        prim: PrimType::Bool
+                    })
+                )
+            ))
+        );
+        assert_eq!(
+            prim_type().parse("(un bool -> lin bool)"),
+            Ok((
+                "",
+                PrimType::Arrow(
+                    Box::new(TypeExpr {
+                        qual: Qual::Un,
+                        prim: PrimType::Bool
+                    }),
+                    Box::new(TypeExpr {
+                        qual: Qual::Lin,
+                        prim: PrimType::Bool
+                    })
+                )
+            ))
+        );
+    }
+}
 
 fn type_expr<'a>() -> impl Parser<'a, TypeExpr> {
     qual()
         .join(prim_type())
         .map(|(q, p)| TypeExpr { qual: q, prim: p })
+}
+#[cfg(test)]
+mod type_expr_test {
+    use super::*;
+
+    // #[test]
+    fn test() {
+        assert_eq!(
+            type_expr().parse("un bool"),
+            Ok((
+                "",
+                TypeExpr {
+                    qual: Qual::Un,
+                    prim: PrimType::Bool
+                }
+            ))
+        );
+    }
 }
