@@ -515,3 +515,23 @@ mod sep_by {
         assert_eq!(Err(("")), parser.parse(""));
     }
 }
+
+fn lexeme<'a, P, A>(parser: P) -> impl Parser<'a, A>
+where
+    A: 'a,
+    P: Parser<'a, A> + 'a,
+{
+    space0().skip(parser)
+}
+#[cfg(test)]
+mod lexeme {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = lexeme(char('a'));
+        assert_eq!(Ok(("", 'a')), parser.parse(" a"));
+        assert_eq!(Ok(("", 'a')), parser.parse("a"));
+        assert_eq!(Err("b"), parser.parse("b"));
+    }
+}
