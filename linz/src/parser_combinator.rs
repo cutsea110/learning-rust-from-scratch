@@ -262,6 +262,17 @@ where
 {
     map(pair(parser1, parser2), |(left, _right)| left)
 }
+#[cfg(test)]
+mod left {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let tag_opener = left(literal("<"), identifier);
+        assert_eq!(Ok(("/>", ())), tag_opener.parse("<my-first-element/>"));
+        assert_eq!(Err("oops"), tag_opener.parse("oops"));
+    }
+}
 
 fn right<'a, P1, P2, R1, R2>(parser1: P1, parser2: P2) -> impl Parser<'a, R2>
 where
@@ -355,6 +366,17 @@ pub fn any_char(input: &str) -> ParseResult<char> {
         _ => Err(input),
     }
 }
+#[cfg(test)]
+mod any_char {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(Ok(("bc", 'a')), any_char.parse("abc"));
+        assert_eq!(Err(""), any_char.parse(""));
+    }
+}
+
 fn pred<'a, P, A, F>(parser: P, predicate: F) -> impl Parser<'a, A>
 where
     P: Parser<'a, A>,
