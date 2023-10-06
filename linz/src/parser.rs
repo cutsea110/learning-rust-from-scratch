@@ -18,161 +18,137 @@
 //! <Y> := epmty
 //!      | <Y> , <V> : <T>
 use crate::lang::*;
+use crate::parser_combinator::*;
 
-/// tokenize program code
-fn tokenize(line: &str) -> Vec<(usize, String)> {
-    use std::mem::take;
-
-    let len = line.len();
-    let mut result = vec![];
-    let mut chars = line.chars().peekable();
-    let mut token = String::new();
-
-    while let Some(c) = chars.next() {
-        match c {
-            // 空白読み飛ばし
-            c if c.is_whitespace() => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-            }
-            // -> は 2 文字トークン
-            c if c == '-' => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-                if let Some(&next_c) = chars.peek() {
-                    if next_c == '>' {
-                        chars.next();
-                        let cc = String::from_utf8(vec![c as u8, next_c as u8]).unwrap();
-                        result.push((len - chars.clone().count() - 2, cc));
-                        continue;
-                    }
-                }
-
-                result.push((len - chars.clone().count() - 1, c.to_string()));
-            }
-            // これらは 1 文字トークン
-            '{' | '}' | '(' | ')' | '<' | '>' | ':' | ';' | ',' | '*' => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-                result.push((len - chars.clone().count() - 1, c.to_string()));
-            }
-            _ => token.push(c),
-        }
-    }
-    if token.len() > 0 {
-        result.push((len - chars.clone().count() - token.len(), token.to_string()));
-    }
-    result
+fn qual<'a>() -> impl Parser<'a, Qual> {
+    let lin = literal("lin").map(|_| Qual::Lin);
+    let un = literal("un").map(|_| Qual::Un);
+    lexeme(lin.or_else(un))
 }
 
-#[cfg(test)]
-mod tokenize {
-    use super::*;
+fn bool<'a>() -> impl Parser<'a, ValExpr> {
+    let t = literal("true").map(|_| ValExpr::Bool(true));
+    let f = literal("false").map(|_| ValExpr::Bool(false));
+    lexeme(t.or_else(f))
+}
 
-    #[test]
-    fn test() {
-        assert_eq!(tokenize(""), vec![]);
-        assert_eq!(tokenize("foo"), vec![(0, "foo".to_string())]);
-        assert_eq!(tokenize("42"), vec![(0, "42".to_string())]);
-        assert_eq!(
-            tokenize("lin fn x : lin bool {if x {lin false} else {lin true}}"),
-            vec![
-                (0, "lin".to_string()),
-                (4, "fn".to_string()),
-                (7, "x".to_string()),
-                (9, ":".to_string()),
-                (11, "lin".to_string()),
-                (15, "bool".to_string()),
-                (20, "{".to_string()),
-                (21, "if".to_string()),
-                (24, "x".to_string()),
-                (26, "{".to_string()),
-                (27, "lin".to_string()),
-                (31, "false".to_string()),
-                (36, "}".to_string()),
-                (38, "else".to_string()),
-                (43, "{".to_string()),
-                (44, "lin".to_string()),
-                (48, "true".to_string()),
-                (52, "}".to_string()),
-                (53, "}".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("un fn x : lin(lin bool * lin bool){split x as a,b {lin <b, a>}}"),
-            vec![
-                (0, "un".to_string()),
-                (3, "fn".to_string()),
-                (6, "x".to_string()),
-                (8, ":".to_string()),
-                (10, "lin".to_string()),
-                (13, "(".to_string()),
-                (14, "lin".to_string()),
-                (18, "bool".to_string()),
-                (23, "*".to_string()),
-                (25, "lin".to_string()),
-                (29, "bool".to_string()),
-                (33, ")".to_string()),
-                (34, "{".to_string()),
-                (35, "split".to_string()),
-                (41, "x".to_string()),
-                (43, "as".to_string()),
-                (46, "a".to_string()),
-                (47, ",".to_string()),
-                (48, "b".to_string()),
-                (50, "{".to_string()),
-                (51, "lin".to_string()),
-                (55, "<".to_string()),
-                (56, "b".to_string()),
-                (57, ",".to_string()),
-                (59, "a".to_string()),
-                (60, ">".to_string()),
-                (61, "}".to_string()),
-                (62, "}".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("lin fn x : lin (lin bool * lin bool) {split x as a, b {free b; a}}"),
-            vec![
-                (0, "lin".to_string()),
-                (4, "fn".to_string()),
-                (7, "x".to_string()),
-                (9, ":".to_string()),
-                (11, "lin".to_string()),
-                (15, "(".to_string()),
-                (16, "lin".to_string()),
-                (20, "bool".to_string()),
-                (25, "*".to_string()),
-                (27, "lin".to_string()),
-                (31, "bool".to_string()),
-                (35, ")".to_string()),
-                (37, "{".to_string()),
-                (38, "split".to_string()),
-                (44, "x".to_string()),
-                (46, "as".to_string()),
-                (49, "a".to_string()),
-                (50, ",".to_string()),
-                (52, "b".to_string()),
-                (54, "{".to_string()),
-                (55, "free".to_string()),
-                (60, "b".to_string()),
-                (61, ";".to_string()),
-                (63, "a".to_string()),
-                (64, "}".to_string()),
-                (65, "}".to_string())
-            ]
-        );
+fn variable(input: &str) -> ParseResult<String> {
+    let mut matched = String::new();
+    let mut chars = input.chars();
+
+    match chars.next() {
+        Some(next) if next.is_alphabetic() || next == '_' => matched.push(next),
+        _ => return Err(input),
     }
+
+    while let Some(next) = chars.next() {
+        if next.is_alphabetic() || next == '_' {
+            matched.push(next);
+        } else {
+            break;
+        }
+    }
+
+    let next_index = matched.len();
+    Ok((&input[next_index..], matched))
+}
+
+fn expr<'a>() -> impl Parser<'a, Expr> {
+    let var = variable.map(|s| Expr::Var(s));
+    let qbool = qual()
+        .join(bool())
+        .map(|(q, b)| Expr::QVal(QValExpr { qual: q, val: b }));
+    let if_expr = literal("if")
+        .skip(expr())
+        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
+        .with(literal("else"))
+        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
+        .map(|((c, t), e)| {
+            Expr::If(IfExpr {
+                cond_expr: Box::new(c),
+                then_expr: Box::new(t),
+                else_expr: Box::new(e),
+            })
+        });
+    let fn_expr = qual()
+        .with(lexeme(literal("fn")))
+        .join(variable)
+        .with(lexeme(char(':')))
+        .join(type_expr())
+        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
+        .map(|(((q, v), t), e)| {
+            Expr::QVal(QValExpr {
+                qual: q,
+                val: ValExpr::Fun(FnExpr {
+                    var: v,
+                    ty: t,
+                    expr: Box::new(e),
+                }),
+            })
+        });
+    let app = parens(expr().join(expr())).map(|(e1, e2)| {
+        Expr::App(AppExpr {
+            expr1: Box::new(e1),
+            expr2: Box::new(e2),
+        })
+    });
+    let tuple = qual()
+        .join(bracket(
+            lexeme(char('<')),
+            expr().with(lexeme(char(','))).join(expr()),
+            lexeme(char('>')),
+        ))
+        .map(|(q, (e1, e2))| {
+            Expr::QVal(QValExpr {
+                qual: q,
+                val: ValExpr::Pair(Box::new(e1), Box::new(e2)),
+            })
+        });
+    let split_expr = literal("split")
+        .skip(expr())
+        .with(literal("as"))
+        .join(variable.with(lexeme(char(','))).join(variable))
+        .join(bracket(lexeme(char('{')), expr(), lexeme(char('}'))))
+        .map(|((e, (v1, v2)), e1)| {
+            Expr::Split(SplitExpr {
+                expr: Box::new(e),
+                left: v1,
+                right: v2,
+                body: Box::new(e1),
+            })
+        });
+    let free_stmt = literal("free")
+        .skip(variable)
+        .with(lexeme(char(';')))
+        .join(expr())
+        .map(|(v, e)| {
+            Expr::Free(FreeExpr {
+                var: v,
+                expr: Box::new(e),
+            })
+        });
+
+    var.or_else(qbool)
+        .or_else(if_expr)
+        .or_else(fn_expr)
+        .or_else(app)
+        .or_else(tuple)
+        .or_else(split_expr)
+        .or_else(free_stmt)
+}
+
+fn prim_type<'a>() -> impl Parser<'a, PrimType> {
+    let bool = lexeme(literal("bool")).map(|_| PrimType::Bool);
+    let tuple = parens(type_expr().with(lexeme(char('*'))).join(type_expr()))
+        .map(|(t1, t2)| PrimType::Pair(Box::new(t1), Box::new(t2)));
+    let arrow = parens(type_expr().with(lexeme(literal("->"))).join(type_expr()))
+        .map(|(t1, t2)| PrimType::Arrow(Box::new(t1), Box::new(t2)));
+
+    bool.or_else(tuple).or_else(arrow)
+}
+
+fn type_expr<'a>() -> impl Parser<'a, TypeExpr> {
+    qual()
+        .join(prim_type())
+        .map(|(q, p)| TypeExpr { qual: q, prim: p })
 }

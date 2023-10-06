@@ -2,8 +2,8 @@
 //!
 //! ref.) https://bodil.lol/parser-combinators/
 //!
-type ParseResult<'a, Output> = Result<(&'a str, Output), &'a str>;
-trait Parser<'a, Output> {
+pub type ParseResult<'a, Output> = Result<(&'a str, Output), &'a str>;
+pub trait Parser<'a, Output> {
     fn parse(&self, input: &'a str) -> ParseResult<'a, Output>;
 
     fn map<F, NewOutput>(self, map_fn: F) -> BoxedParser<'a, NewOutput>
@@ -110,7 +110,7 @@ where
     }
 }
 
-struct BoxedParser<'a, Output> {
+pub struct BoxedParser<'a, Output> {
     parser: Box<dyn Parser<'a, Output> + 'a>,
 }
 impl<'a, Output> BoxedParser<'a, Output> {
@@ -129,7 +129,7 @@ impl<'a, Output> Parser<'a, Output> for BoxedParser<'a, Output> {
     }
 }
 
-fn literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
+pub fn literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
     move |input: &'a str| match input.get(0..expected.len()) {
         Some(next) if next == expected => Ok((&input[expected.len()..], ())),
         _ => Err(input),
@@ -327,7 +327,7 @@ mod zero_or_more {
     }
 }
 
-fn any_char(input: &str) -> ParseResult<char> {
+pub fn any_char(input: &str) -> ParseResult<char> {
     match input.chars().next() {
         Some(next) => Ok((&input[next.len_utf8()..], next)),
         _ => Err(input),
@@ -360,18 +360,18 @@ mod pred {
     }
 }
 
-fn whitespace_char<'a>() -> impl Parser<'a, char> {
+pub fn whitespace_char<'a>() -> impl Parser<'a, char> {
     any_char.pred(|c| c.is_whitespace())
 }
 
-fn space1<'a>() -> impl Parser<'a, Vec<char>> {
+pub fn space1<'a>() -> impl Parser<'a, Vec<char>> {
     whitespace_char().many1()
 }
-fn space0<'a>() -> impl Parser<'a, Vec<char>> {
+pub fn space0<'a>() -> impl Parser<'a, Vec<char>> {
     whitespace_char().many0()
 }
 
-fn char<'a>(c: char) -> impl Parser<'a, char> {
+pub fn char<'a>(c: char) -> impl Parser<'a, char> {
     move |input: &'a str| {
         if let Some(next_ch) = input.chars().next() {
             if next_ch == c {
@@ -395,7 +395,11 @@ mod char {
     }
 }
 
-fn bracket<'a, R1, R2, R3, P1, P2, P3>(parser1: P1, parser2: P2, parser3: P3) -> impl Parser<'a, R2>
+pub fn bracket<'a, R1, R2, R3, P1, P2, P3>(
+    parser1: P1,
+    parser2: P2,
+    parser3: P3,
+) -> impl Parser<'a, R2>
 where
     R1: 'a,
     R2: 'a,
@@ -406,15 +410,15 @@ where
 {
     parser1.skip(parser2).with(parser3)
 }
-fn parens<'a, A, P>(parser: P) -> impl Parser<'a, A>
+pub fn parens<'a, A, P>(parser: P) -> impl Parser<'a, A>
 where
     A: 'a,
     P: Parser<'a, A> + 'a,
 {
-    bracket(char('('), parser, char(')'))
+    bracket(lexeme(char('(')), parser, lexeme(char(')')))
 }
 
-fn double_quoted_string<'a>() -> impl Parser<'a, String> {
+pub fn double_quoted_string<'a>() -> impl Parser<'a, String> {
     char('"')
         .skip(any_char.pred(|c| *c != '"').many0())
         .with(char('"'))
@@ -433,7 +437,7 @@ mod double_quoted_string {
     }
 }
 
-fn single_quoted_string<'a>() -> impl Parser<'a, String> {
+pub fn single_quoted_string<'a>() -> impl Parser<'a, String> {
     char('\'')
         .skip(any_char.pred(|c| *c != '\'').many0())
         .with(char('\''))
@@ -512,11 +516,11 @@ mod sep_by {
         let parser = sep_by(any_char, char(','));
         assert_eq!(Ok(("", vec!['a', 'b', 'c'])), parser.parse("a,b,c"));
         assert_eq!(Ok(("", vec!['a'])), parser.parse("a"));
-        assert_eq!(Err(("")), parser.parse(""));
+        assert_eq!(Err(""), parser.parse(""));
     }
 }
 
-fn lexeme<'a, P, A>(parser: P) -> impl Parser<'a, A>
+pub fn lexeme<'a, P, A>(parser: P) -> impl Parser<'a, A>
 where
     A: 'a,
     P: Parser<'a, A> + 'a,
