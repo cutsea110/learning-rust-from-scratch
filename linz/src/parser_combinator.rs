@@ -289,7 +289,22 @@ mod char {
     }
 }
 
-fn quoted_string<'a>() -> impl Parser<'a, String> {
+fn bracket<'a, R1, R2, R3, P1, P2, P3>(parser1: P1, parser2: P2, parser3: P3) -> impl Parser<'a, R2>
+where
+    P1: Parser<'a, R1>,
+    P2: Parser<'a, R2>,
+    P3: Parser<'a, R3>,
+{
+    right(parser1, left(parser2, parser3))
+}
+fn parens<'a, A, P>(parser: P) -> impl Parser<'a, A>
+where
+    P: Parser<'a, A>,
+{
+    bracket(char('('), parser, char(')'))
+}
+
+fn double_quoted_string<'a>() -> impl Parser<'a, String> {
     map(
         right(
             char('"'),
@@ -299,14 +314,36 @@ fn quoted_string<'a>() -> impl Parser<'a, String> {
     )
 }
 #[cfg(test)]
-mod quoted_string {
+mod double_quoted_string {
     use super::*;
 
     #[test]
     fn test() {
         assert_eq!(
             Ok(("", "Hello Joe!".to_string())),
-            quoted_string().parse("\"Hello Joe!\"")
+            double_quoted_string().parse("\"Hello Joe!\"")
+        );
+    }
+}
+
+fn single_quoted_string<'a>() -> impl Parser<'a, String> {
+    map(
+        right(
+            char('\''),
+            left(zero_or_more(pred(any_char, |c| *c != '\'')), char('\'')),
+        ),
+        |chars| chars.into_iter().collect(),
+    )
+}
+#[cfg(test)]
+mod single_quoted_string {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            Ok(("", "Hello Joe!".to_string())),
+            single_quoted_string().parse("'Hello Joe!'")
         );
     }
 }
