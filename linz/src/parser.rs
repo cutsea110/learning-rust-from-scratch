@@ -114,9 +114,7 @@ mod variable_test {
 }
 
 fn qual_bool<'a>() -> impl Parser<'a, QValExpr> {
-    qual()
-        .join(bool())
-        .map(|(q, b)| QValExpr { qual: q, val: b })
+    qual().and_then(|qual| bool().map(move |val| QValExpr { qual, val }))
 }
 #[cfg(test)]
 mod qual_bool_test {
@@ -173,26 +171,52 @@ mod qual_bool_test {
 }
 
 fn if_expr<'a>() -> impl Parser<'a, IfExpr> {
-    literal("if")
-        .skip(expr())
-        .join(braces(expr()))
-        .with(lexeme(literal("else")))
-        .join(braces(expr()))
-        .map(|((c, t), e)| IfExpr {
-            cond_expr: Box::new(c),
-            then_expr: Box::new(t),
-            else_expr: Box::new(e),
+    let if_ = lexeme(literal("if")).skip(expr());
+    let then_ = braces(expr());
+    let else_ = lexeme(literal("else")).skip(braces(expr()));
+
+    move |input| {
+        if_.parse(input).and_then(|(next_input, c)| {
+            then_.parse(next_input).and_then(|(next_input, t)| {
+                else_.parse(next_input).and_then(|(next_input, e)| {
+                    Ok((
+                        next_input,
+                        IfExpr {
+                            cond_expr: Box::new(c),
+                            then_expr: Box::new(t),
+                            else_expr: Box::new(e),
+                        },
+                    ))
+                })
+            })
         })
+    }
 }
 #[cfg(test)]
 mod if_expr_test {
     use super::*;
 
-    // #[test]
+    #[test]
     fn test() {
         assert_eq!(
             if_expr().parse("if lin true { un false } else { lin true }"),
-            Err("")
+            Ok((
+                "",
+                IfExpr {
+                    cond_expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Bool(true)
+                    })),
+                    then_expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Un,
+                        val: ValExpr::Bool(false)
+                    })),
+                    else_expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Bool(true)
+                    }))
+                }
+            ))
         );
     }
 }
