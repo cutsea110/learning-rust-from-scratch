@@ -120,6 +120,115 @@ pub fn parse_expr(i: &str) -> ParseResult<Expr> {
         _ => Ok((next_i, Expr::Var(tok.to_string()))),
     }
 }
+#[cfg(test)]
+mod parse_expr {
+    use super::*;
+
+    #[test]
+    fn test_parse_expr() {
+        assert_eq!(
+            parse_expr("let x: un bool = lin true; x"),
+            Ok((
+                "",
+                Expr::Let(LetExpr {
+                    var: "x".to_string(),
+                    ty: TypeExpr {
+                        qual: Qual::Un,
+                        prim: PrimType::Bool
+                    },
+                    expr1: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Bool(true)
+                    })),
+                    expr2: Box::new(Expr::Var("x".to_string())),
+                })
+            ))
+        );
+        assert_eq!(
+            parse_expr("if lin true { lin false } else { lin true }"),
+            Ok((
+                "",
+                Expr::If(IfExpr {
+                    cond_expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Bool(true)
+                    })),
+                    then_expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Bool(false)
+                    })),
+                    else_expr: Box::new(Expr::QVal(QValExpr {
+                        qual: Qual::Lin,
+                        val: ValExpr::Bool(true)
+                    })),
+                })
+            ))
+        );
+        assert_eq!(
+            parse_expr("split v as x, y { x }"),
+            Ok((
+                "",
+                Expr::Split(SplitExpr {
+                    expr: Box::new(Expr::Var("v".to_string())),
+                    left: "x".to_string(),
+                    right: "y".to_string(),
+                    body: Box::new(Expr::Var("x".to_string())),
+                })
+            ))
+        );
+        assert_eq!(
+            parse_expr("free x; x"),
+            Ok((
+                "",
+                Expr::Free(FreeExpr {
+                    var: "x".to_string(),
+                    expr: Box::new(Expr::Var("x".to_string())),
+                })
+            ))
+        );
+        assert_eq!(
+            parse_expr("lin true"),
+            Ok((
+                "",
+                Expr::QVal(QValExpr {
+                    qual: Qual::Lin,
+                    val: ValExpr::Bool(true)
+                })
+            ))
+        );
+        assert_eq!(
+            parse_expr("un false"),
+            Ok((
+                "",
+                Expr::QVal(QValExpr {
+                    qual: Qual::Un,
+                    val: ValExpr::Bool(false)
+                })
+            ))
+        );
+        assert_eq!(
+            parse_expr("un <lin true, un false>"),
+            Ok((
+                "",
+                Expr::QVal(QValExpr {
+                    qual: Qual::Un,
+                    val: ValExpr::Pair(
+                        Box::new(Expr::QVal(QValExpr {
+                            qual: Qual::Lin,
+                            val: ValExpr::Bool(true)
+                        })),
+                        Box::new(Expr::QVal(QValExpr {
+                            qual: Qual::Un,
+                            val: ValExpr::Bool(false)
+                        })),
+                    )
+                })
+            ))
+        );
+        assert_eq!(parse_expr("abc"), Ok(("", Expr::Var("abc".to_string()))));
+        assert_eq!(parse_expr("abc!"), Ok(("!", Expr::Var("abc".to_string()))));
+    }
+}
 
 fn parse_let(i: &str) -> ParseResult<Expr> {
     let (i, _) = keyword("let").parse(i)?;
