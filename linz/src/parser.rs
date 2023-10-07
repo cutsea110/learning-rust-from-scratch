@@ -171,11 +171,12 @@ mod qual_bool_test {
 }
 
 fn if_expr<'a>() -> impl Parser<'a, IfExpr> {
-    let if_ = lexeme(literal("if")).skip(expr());
-    let then_ = braces(expr());
-    let else_ = lexeme(literal("else")).skip(braces(expr()));
+    |input| {
+        // これらの束縛は lambda 式内に持ち込まないと stack overflow する
+        let if_ = lexeme(literal("if")).skip(expr());
+        let then_ = braces(expr());
+        let else_ = lexeme(literal("else")).skip(braces(expr()));
 
-    move |input| {
         if_.parse(input).and_then(|(next_input, c)| {
             then_.parse(next_input).and_then(|(next_input, t)| {
                 else_.parse(next_input).and_then(|(next_input, e)| {
@@ -432,17 +433,17 @@ mod free_stmt_test {
 }
 
 fn expr<'a>() -> impl Parser<'a, Expr> {
-    let qbool = qual_bool().map(|e| Expr::QVal(e));
-    // let if_expr = if_expr().map(|e| Expr::If(e));
+    let qbool = qual_bool().map(Expr::QVal);
+    let if_expr = if_expr().map(Expr::If);
     // let fn_expr = fn_expr().map(|e| Expr::QVal(e));
     // let app = app_expr().map(|e| Expr::App(e));
     // let tuple = tuple_expr().map(|e| Expr::QVal(e));
     // let split_expr = split_expr().map(|e| Expr::Split(e));
     // let free_stmt = free_stmt().map(|e| Expr::Free(e));
-    let var = lexeme(variable).map(|s| Expr::Var(s));
+    let var = lexeme(variable).map(Expr::Var);
 
     qbool
-        // .or_else(if_expr)
+        .or_else(if_expr)
         // .or_else(fn_expr)
         // .or_else(app)
         // .or_else(tuple)
