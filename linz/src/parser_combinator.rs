@@ -254,6 +254,24 @@ where
             .map(|(next_input, result)| (next_input, map_fn(result)))
     }
 }
+#[cfg(test)]
+mod map {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let hello_parser = map(literal("Hello"), |_| "Hello, General Kenobi!");
+        assert_eq!(
+            Ok(("", "Hello, General Kenobi!")),
+            hello_parser.parse("Hello")
+        );
+        assert_eq!(
+            Ok((" there", "Hello, General Kenobi!")),
+            hello_parser.parse("Hello there")
+        );
+        assert_eq!(Err("Hi"), hello_parser.parse("Hi"));
+    }
+}
 
 fn left<'a, P1, P2, R1, R2>(parser1: P1, parser2: P2) -> impl Parser<'a, R1>
 where
@@ -524,6 +542,22 @@ where
     move |input| match parser1.parse(input) {
         ok @ Ok(_) => ok,
         Err(_) => parser2.parse(input),
+    }
+}
+#[cfg(test)]
+mod altl {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = altl(char('o'), char('e'));
+        assert_eq!(Ok(("mg", 'o')), parser.parse("omg"));
+        assert_eq!(Ok(("mg", 'e')), parser.parse("emg"));
+        assert_eq!(Err("lol"), parser.parse("lol"));
+
+        let parser = altl(char('o'), altl(char('e'), char('u')));
+        assert_eq!(Ok(("mg", 'u')), parser.parse("umg"));
+        assert_eq!(Err("img"), parser.parse("img"));
     }
 }
 
