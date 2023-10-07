@@ -25,86 +25,8 @@
 //! <T>     := <Q> <P>
 //! <P>     := bool | ( <T> * <T> ) | ( <T> -> <T> )
 //! ```
-
 use crate::lang::*;
 use crate::parser_combinator::*;
-
-fn parse_var(input: &str) -> ParseResult<&str> {
-    let mut pos = 0;
-    let mut chars = input.chars();
-
-    match chars.next() {
-        Some(next) if next.is_alphabetic() || next == '_' => pos += 1,
-        _ => return Err(input),
-    }
-
-    while let Some(next) = chars.next() {
-        if next.is_alphanumeric() || next == '_' {
-            pos += 1;
-        } else {
-            break;
-        }
-    }
-
-    Ok((&input[pos..], &input[..pos]))
-}
-#[cfg(test)]
-mod parse_var {
-    use super::*;
-
-    #[test]
-    fn test_parse_var() {
-        assert_eq!(parse_var("abc"), Ok(("", "abc")));
-        assert_eq!(parse_var("abc123"), Ok(("", "abc123")));
-        assert_eq!(parse_var("abc_123"), Ok(("", "abc_123")));
-        assert_eq!(parse_var("abc_123def"), Ok(("", "abc_123def")));
-        assert_eq!(parse_var("123abc"), Err("123abc"));
-        assert_eq!(parse_var("123"), Err("123"));
-        assert_eq!(parse_var("123abc"), Err("123abc"));
-        assert_eq!(parse_var("abc!"), Ok(("!", "abc")));
-    }
-}
-
-fn first_token(i: &str) -> ParseResult<&str> {
-    match keyword("let")
-        .or_else(keyword("if"))
-        .or_else(keyword("split"))
-        .or_else(keyword("free"))
-        .or_else(keyword("lin"))
-        .or_else(keyword("un"))
-        .or_else(keyword("("))
-        .parse(i)
-    {
-        ok @ Ok(_) => ok,
-        Err(_) => parse_var(i),
-    }
-}
-#[cfg(test)]
-mod first_token {
-    use super::*;
-
-    #[test]
-    fn test_first_token() {
-        assert_eq!(first_token("let x y"), Ok((" x y", "let")));
-        assert_eq!(
-            first_token("if c { t } else { e }"),
-            Ok((" c { t } else { e }", "if"))
-        );
-        assert_eq!(
-            first_token("split v as x,y { e }"),
-            Ok((" v as x,y { e }", "split"))
-        );
-        assert_eq!(first_token("free x; e"), Ok((" x; e", "free")));
-        assert_eq!(first_token("lin true"), Ok((" true", "lin")));
-        assert_eq!(first_token("un false"), Ok((" false", "un")));
-        assert_eq!(
-            first_token("(lin true, un false)"),
-            Ok(("lin true, un false)", "("))
-        );
-        assert_eq!(first_token("abc"), Ok(("", "abc")));
-        assert_eq!(first_token("abc!"), Ok(("!", "abc")));
-    }
-}
 
 pub fn parse_expr(i: &str) -> ParseResult<Expr> {
     let (i, _) = space0().parse(i)?;
@@ -227,6 +149,83 @@ mod parse_expr {
         );
         assert_eq!(parse_expr("abc"), Ok(("", Expr::Var("abc".to_string()))));
         assert_eq!(parse_expr("abc!"), Ok(("!", Expr::Var("abc".to_string()))));
+    }
+}
+
+fn parse_var(input: &str) -> ParseResult<&str> {
+    let mut pos = 0;
+    let mut chars = input.chars();
+
+    match chars.next() {
+        Some(next) if next.is_alphabetic() || next == '_' => pos += 1,
+        _ => return Err(input),
+    }
+
+    while let Some(next) = chars.next() {
+        if next.is_alphanumeric() || next == '_' {
+            pos += 1;
+        } else {
+            break;
+        }
+    }
+
+    Ok((&input[pos..], &input[..pos]))
+}
+#[cfg(test)]
+mod parse_var {
+    use super::*;
+
+    #[test]
+    fn test_parse_var() {
+        assert_eq!(parse_var("abc"), Ok(("", "abc")));
+        assert_eq!(parse_var("abc123"), Ok(("", "abc123")));
+        assert_eq!(parse_var("abc_123"), Ok(("", "abc_123")));
+        assert_eq!(parse_var("abc_123def"), Ok(("", "abc_123def")));
+        assert_eq!(parse_var("123abc"), Err("123abc"));
+        assert_eq!(parse_var("123"), Err("123"));
+        assert_eq!(parse_var("123abc"), Err("123abc"));
+        assert_eq!(parse_var("abc!"), Ok(("!", "abc")));
+    }
+}
+
+fn first_token(i: &str) -> ParseResult<&str> {
+    match keyword("let")
+        .or_else(keyword("if"))
+        .or_else(keyword("split"))
+        .or_else(keyword("free"))
+        .or_else(keyword("lin"))
+        .or_else(keyword("un"))
+        .or_else(keyword("("))
+        .parse(i)
+    {
+        ok @ Ok(_) => ok,
+        Err(_) => parse_var(i),
+    }
+}
+#[cfg(test)]
+mod first_token {
+    use super::*;
+
+    #[test]
+    fn test_first_token() {
+        assert_eq!(first_token("let x y"), Ok((" x y", "let")));
+        assert_eq!(
+            first_token("if c { t } else { e }"),
+            Ok((" c { t } else { e }", "if"))
+        );
+        assert_eq!(
+            first_token("split v as x,y { e }"),
+            Ok((" v as x,y { e }", "split"))
+        );
+        assert_eq!(first_token("free x; e"), Ok((" x; e", "free")));
+        assert_eq!(first_token("lin true"), Ok((" true", "lin")));
+        assert_eq!(first_token("un false"), Ok((" false", "un")));
+        assert_eq!(
+            first_token("(lin true, un false)"),
+            Ok(("lin true, un false)", "("))
+        );
+        assert_eq!(first_token("abc"), Ok(("", "abc")));
+        assert_eq!(first_token("abc!"), Ok(("!", "abc")));
     }
 }
 
