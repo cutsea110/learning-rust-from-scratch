@@ -689,6 +689,22 @@ mod bind {
 
     #[test]
     fn test() {
+        let parser = bind(any_char, |x| {
+            bind(char('='), move |_| bind(any_char, move |y| ret((x, y))))
+        });
+        assert_eq!(parser.parse("a=b"), Ok(("", ('a', 'b'))));
+        assert_eq!(parser.parse("x=y"), Ok(("", ('x', 'y'))));
+
+        let parser = bind(identifier.with(char('=')), |x| {
+            bind(double_quoted_string(), move |y| ret((x.clone(), y)))
+        });
+        assert_eq!(
+            Ok(("", ("foo".to_string(), "bar".to_string()))),
+            parser.parse("foo=\"bar\"")
+        );
+        assert_eq!(Err("bar"), parser.parse("foo=bar"));
+        assert_eq!(Err(""), parser.parse("nope"));
+
         let parser = bind(char('h'), |ch1| {
             bind(char('e'), move |ch2| {
                 bind(char('y'), move |ch3| ret(format!("{}{}{}", ch1, ch2, ch3)))
