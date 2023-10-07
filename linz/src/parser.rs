@@ -29,7 +29,7 @@
 use crate::lang::*;
 use crate::parser_combinator::*;
 
-fn identifier(input: &str) -> ParseResult<&str> {
+fn parse_var(input: &str) -> ParseResult<&str> {
     let mut pos = 0;
     let mut chars = input.chars();
 
@@ -49,49 +49,35 @@ fn identifier(input: &str) -> ParseResult<&str> {
     Ok((&input[pos..], &input[..pos]))
 }
 #[cfg(test)]
-mod identifier {
+mod parse_var {
     use super::*;
 
     #[test]
-    fn test_identifier() {
-        assert_eq!(identifier("abc"), Ok(("", "abc")));
-        assert_eq!(identifier("abc123"), Ok(("", "abc123")));
-        assert_eq!(identifier("abc_123"), Ok(("", "abc_123")));
-        assert_eq!(identifier("abc_123def"), Ok(("", "abc_123def")));
-        assert_eq!(identifier("123abc"), Err("123abc"));
-        assert_eq!(identifier("123"), Err("123"));
-        assert_eq!(identifier("123abc"), Err("123abc"));
-        assert_eq!(identifier("abc!"), Ok(("!", "abc")));
+    fn test_parse_var() {
+        assert_eq!(parse_var("abc"), Ok(("", "abc")));
+        assert_eq!(parse_var("abc123"), Ok(("", "abc123")));
+        assert_eq!(parse_var("abc_123"), Ok(("", "abc_123")));
+        assert_eq!(parse_var("abc_123def"), Ok(("", "abc_123def")));
+        assert_eq!(parse_var("123abc"), Err("123abc"));
+        assert_eq!(parse_var("123"), Err("123"));
+        assert_eq!(parse_var("123abc"), Err("123abc"));
+        assert_eq!(parse_var("abc!"), Ok(("!", "abc")));
     }
 }
 
 fn first_token(i: &str) -> ParseResult<&str> {
-    if let ok @ Ok(_) = keyword("let").parse(i) {
-        return ok;
+    match keyword("let")
+        .or_else(keyword("if"))
+        .or_else(keyword("split"))
+        .or_else(keyword("free"))
+        .or_else(keyword("lin"))
+        .or_else(keyword("un"))
+        .or_else(keyword("("))
+        .parse(i)
+    {
+        ok @ Ok(_) => ok,
+        Err(_) => parse_var(i),
     }
-    if let ok @ Ok(_) = keyword("if").parse(i) {
-        return ok;
-    }
-    if let ok @ Ok(_) = keyword("split").parse(i) {
-        return ok;
-    }
-    if let ok @ Ok(_) = keyword("free").parse(i) {
-        return ok;
-    }
-    if let ok @ Ok(_) = keyword("lin").parse(i) {
-        return ok;
-    }
-    if let ok @ Ok(_) = keyword("un").parse(i) {
-        return ok;
-    }
-    if let ok @ Ok(_) = keyword("(").parse(i) {
-        return ok;
-    }
-    if let ok @ Ok(_) = identifier(i) {
-        return ok;
-    }
-
-    Err(i)
 }
 #[cfg(test)]
 mod first_token {
@@ -139,7 +125,7 @@ fn parse_let(i: &str) -> ParseResult<Expr> {
     let (i, _) = keyword("let").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
-    let (i, var) = identifier(i)?;
+    let (i, var) = parse_var(i)?;
 
     let (i, _) = space0().parse(i)?;
     let (i, _) = char(':').parse(i)?;
@@ -245,13 +231,13 @@ fn parse_split(i: &str) -> ParseResult<Expr> {
     let (i, _) = keyword("as").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
-    let (i, var1) = identifier(i)?;
+    let (i, var1) = parse_var(i)?;
 
     let (i, _) = space0().parse(i)?;
     let (i, _) = char(',').parse(i)?;
     let (i, _) = space0().parse(i)?;
 
-    let (i, var2) = identifier(i)?;
+    let (i, var2) = parse_var(i)?;
     let (i, _) = space0().parse(i)?;
 
     let (i, e2) = braces(parse_expr).parse(i)?;
@@ -291,7 +277,7 @@ fn parse_free(i: &str) -> ParseResult<Expr> {
     let (i, _) = keyword("free").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
-    let (i, var) = identifier(i)?;
+    let (i, var) = parse_var(i)?;
     let (i, _) = space0().parse(i)?;
     let (i, _) = char(';').parse(i)?;
 
@@ -411,7 +397,7 @@ fn parse_fn(i: &str) -> ParseResult<ValExpr> {
     let (i, _) = keyword("fn").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
-    let (i, var) = identifier(i)?;
+    let (i, var) = parse_var(i)?;
 
     let (i, _) = space0().parse(i)?;
     let (i, _) = char(':').parse(i)?;
