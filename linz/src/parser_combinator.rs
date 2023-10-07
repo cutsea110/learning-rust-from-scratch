@@ -260,16 +260,9 @@ mod map {
 
     #[test]
     fn test() {
-        let hello_parser = map(literal("Hello"), |_| "Hello, General Kenobi!");
-        assert_eq!(
-            Ok(("", "Hello, General Kenobi!")),
-            hello_parser.parse("Hello")
-        );
-        assert_eq!(
-            Ok((" there", "Hello, General Kenobi!")),
-            hello_parser.parse("Hello there")
-        );
-        assert_eq!(Err("Hi"), hello_parser.parse("Hi"));
+        let hello_parser = map(identifier, |s| s.len());
+        assert_eq!(Ok(("", 5)), hello_parser.parse("Hello"));
+        assert_eq!(Err("123"), hello_parser.parse("123"));
     }
 }
 
@@ -289,6 +282,7 @@ mod left {
         let tag_opener = left(literal("<"), identifier);
         assert_eq!(Ok(("/>", ())), tag_opener.parse("<my-first-element/>"));
         assert_eq!(Err("oops"), tag_opener.parse("oops"));
+        assert_eq!(Err("!oops"), tag_opener.parse("<!oops"));
     }
 }
 
@@ -425,12 +419,43 @@ mod pred {
 pub fn whitespace_char<'a>() -> impl Parser<'a, char> {
     any_char.pred(|c| c.is_whitespace())
 }
+#[cfg(test)]
+mod whitespace_char {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(Ok(("omg", ' ')), whitespace_char().parse(" omg"));
+        assert_eq!(Err("lol"), whitespace_char().parse("lol"));
+    }
+}
 
 pub fn space1<'a>() -> impl Parser<'a, Vec<char>> {
     whitespace_char().many1()
 }
+#[cfg(test)]
+mod space1 {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(Ok(("omg", vec![' ', ' '])), space1().parse("  omg"));
+        assert_eq!(Err("lol"), space1().parse("lol"));
+    }
+}
+
 pub fn space0<'a>() -> impl Parser<'a, Vec<char>> {
     whitespace_char().many0()
+}
+#[cfg(test)]
+mod space0 {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(Ok(("omg", vec![' ', ' '])), space0().parse("  omg"));
+        assert_eq!(Ok(("lol", vec![])), space0().parse("lol"));
+    }
 }
 
 pub fn char<'a>(c: char) -> impl Parser<'a, char> {
@@ -479,6 +504,20 @@ where
 {
     bracket(lexeme(char('(')), parser, lexeme(char(')')))
 }
+#[cfg(test)]
+mod parens {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = parens(literal("hello"));
+        assert_eq!(Ok(("", ())), parser.parse("(hello)"));
+        assert_eq!(Err("hello"), parser.parse("hello"));
+        assert_eq!(Err(""), parser.parse("(hello"));
+        assert_eq!(Ok((")", ())), parser.parse("(hello))"));
+        assert_eq!(Err("(hello))"), parser.parse("((hello))"));
+    }
+}
 
 pub fn braces<'a, A, F>(parser: F) -> impl Parser<'a, A>
 where
@@ -487,6 +526,20 @@ where
 {
     bracket(lexeme(char('{')), parser, lexeme(char('}')))
 }
+#[cfg(test)]
+mod braces {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = braces(literal("hello"));
+        assert_eq!(Ok(("", ())), parser.parse("{hello}"));
+        assert_eq!(Err("hello"), parser.parse("hello"));
+        assert_eq!(Err(""), parser.parse("{hello"));
+        assert_eq!(Ok(("}", ())), parser.parse("{hello}}"));
+        assert_eq!(Err("{hello}}"), parser.parse("{{hello}}"));
+    }
+}
 
 pub fn angles<'a, A, F>(parser: F) -> impl Parser<'a, A>
 where
@@ -494,6 +547,20 @@ where
     F: Parser<'a, A> + 'a,
 {
     bracket(lexeme(char('<')), parser, lexeme(char('>')))
+}
+#[cfg(test)]
+mod angles {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = angles(literal("hello"));
+        assert_eq!(Ok(("", ())), parser.parse("<hello>"));
+        assert_eq!(Err("hello"), parser.parse("hello"));
+        assert_eq!(Err(""), parser.parse("<hello"));
+        assert_eq!(Ok((">", ())), parser.parse("<hello>>"));
+        assert_eq!(Err("<hello>>"), parser.parse("<<hello>>"));
+    }
 }
 
 pub fn double_quoted_string<'a>() -> impl Parser<'a, String> {
