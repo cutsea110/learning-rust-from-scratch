@@ -218,6 +218,17 @@ mod if_expr_test {
                 }
             ))
         );
+        assert_eq!(
+            if_expr().parse("if x { y } else { z }"),
+            Ok((
+                "",
+                IfExpr {
+                    cond_expr: Box::new(Expr::Var("x".to_string())),
+                    then_expr: Box::new(Expr::Var("y".to_string())),
+                    else_expr: Box::new(Expr::Var("z".to_string())),
+                }
+            ))
+        );
     }
 }
 
@@ -428,7 +439,7 @@ fn expr<'a>() -> impl Parser<'a, Expr> {
     // let tuple = tuple_expr().map(|e| Expr::QVal(e));
     // let split_expr = split_expr().map(|e| Expr::Split(e));
     // let free_stmt = free_stmt().map(|e| Expr::Free(e));
-    let var = variable.map(|s| Expr::Var(s));
+    let var = lexeme(variable).map(|s| Expr::Var(s));
 
     qbool
         // .or_else(if_expr)
