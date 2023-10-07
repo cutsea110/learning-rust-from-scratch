@@ -129,6 +129,23 @@ impl<'a, Output> Parser<'a, Output> for BoxedParser<'a, Output> {
     }
 }
 
+pub fn keyword<'a>(expected: &'static str) -> impl Parser<'a, &str> {
+    move |input: &'a str| match input.get(0..expected.len()) {
+        Some(next) if next == expected => Ok((&input[expected.len()..], expected)),
+        _ => Err(input),
+    }
+}
+#[cfg(test)]
+mod keyword {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(Ok(("", "let")), keyword("let").parse("let"));
+        assert_eq!(Err("foo"), keyword("let").parse("foo"));
+    }
+}
+
 pub fn literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
     move |input: &'a str| match input.get(0..expected.len()) {
         Some(next) if next == expected => Ok((&input[expected.len()..], ())),
