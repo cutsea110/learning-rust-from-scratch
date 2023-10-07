@@ -3,7 +3,7 @@
 //! # 構文
 //!
 //! ```text
-//! <VAR>   := [a-zA-Z]+
+//! <VAR>   := [a-zA-Z_][a-zA-Z0-9_]*
 //!
 //! <E>     := <LET> | <IF> | <SPLIT> | <FREE> | <APP> | <VAR> | <QVAL>
 //!
