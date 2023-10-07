@@ -558,6 +558,50 @@ mod altl {
         let parser = altl(char('o'), altl(char('e'), char('u')));
         assert_eq!(Ok(("mg", 'u')), parser.parse("umg"));
         assert_eq!(Err("img"), parser.parse("img"));
+
+        let parser = altl(
+            pair(literal("Hi!,"), identifier),
+            pair(literal("Bye~"), identifier),
+        );
+        assert_eq!(Ok(("", ((), "foo".to_string()))), parser.parse("Hi!,foo"));
+        assert_eq!(Ok(("", ((), "bar".to_string()))), parser.parse("Bye~bar"));
+        assert_eq!(Err("Hello!,foo"), parser.parse("Hello!,foo"));
+        assert_eq!(Err("Hi!,123"), parser.parse("Hi!,123"));
+
+        let parser = altl(
+            pair(
+                identifier,
+                lexeme(literal("Hi!")).map(|_| "Hi.".to_string()),
+            ),
+            pair(identifier, lexeme(identifier)),
+        );
+        assert_eq!(
+            Ok(("", ("foo".to_string(), "Hi.".to_string()))),
+            parser.parse("foo Hi!")
+        );
+        assert_eq!(
+            Ok(("", ("foo".to_string(), "bar".to_string()))),
+            parser.parse("foo bar")
+        );
+        assert_eq!(Err("123 bar"), parser.parse("123 bar"));
+    }
+}
+
+fn ret<'a, A>(v: A) -> impl Parser<'a, A>
+where
+    A: Clone + 'a,
+{
+    move |input| Ok((input, v.clone()))
+}
+#[cfg(test)]
+mod ret {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = ret('a');
+        assert_eq!(Ok(("bc", 'a')), parser.parse("bc"));
+        assert_eq!(Ok(("", 'a')), parser.parse(""));
     }
 }
 
@@ -570,6 +614,21 @@ where
     move |input| match parser.parse(input) {
         Ok((next_input, result)) => f(result).parse(next_input),
         Err(e) => Err(e),
+    }
+}
+#[cfg(test)]
+mod bind {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = bind(char('h'), |ch1| {
+            bind(char('e'), move |ch2| {
+                bind(char('y'), move |ch3| ret(format!("{}{}{}", ch1, ch2, ch3)))
+            })
+        });
+        assert_eq!(Ok((" there", "hey".to_string())), parser.parse("hey there"));
+        assert_eq!(Err("nope"), parser.parse("nope"));
     }
 }
 
