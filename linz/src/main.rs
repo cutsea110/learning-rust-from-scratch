@@ -1,3 +1,4 @@
+mod helper;
 mod lang;
 mod parser;
 mod parser_combinator;
