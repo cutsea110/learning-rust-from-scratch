@@ -164,6 +164,10 @@ mod qual_bool_test {
                 }
             ))
         );
+        assert_eq!(qual_bool().parse("un"), Err(""));
+        assert_eq!(qual_bool().parse("lin"), Err(""));
+        assert_eq!(qual_bool().parse("true"), Err("true"));
+        assert_eq!(qual_bool().parse("false"), Err("false"));
         assert_eq!(qual_bool().parse("foo"), Err("foo"));
     }
 }
@@ -393,22 +397,47 @@ mod free_stmt_test {
 }
 
 fn expr<'a>() -> impl Parser<'a, Expr> {
-    let var = variable.map(|s| Expr::Var(s));
     let qbool = qual_bool().map(|e| Expr::QVal(e));
-    let if_expr = if_expr().map(|e| Expr::If(e));
-    let fn_expr = fn_expr().map(|e| Expr::QVal(e));
-    let app = app_expr().map(|e| Expr::App(e));
-    let tuple = tuple_expr().map(|e| Expr::QVal(e));
-    let split_expr = split_expr().map(|e| Expr::Split(e));
-    let free_stmt = free_stmt().map(|e| Expr::Free(e));
+    // let if_expr = if_expr().map(|e| Expr::If(e));
+    // let fn_expr = fn_expr().map(|e| Expr::QVal(e));
+    // let app = app_expr().map(|e| Expr::App(e));
+    // let tuple = tuple_expr().map(|e| Expr::QVal(e));
+    // let split_expr = split_expr().map(|e| Expr::Split(e));
+    // let free_stmt = free_stmt().map(|e| Expr::Free(e));
+    let var = variable.map(|s| Expr::Var(s));
 
-    var.or_else(qbool)
-        .or_else(if_expr)
-        .or_else(fn_expr)
-        .or_else(app)
-        .or_else(tuple)
-        .or_else(split_expr)
-        .or_else(free_stmt)
+    qbool
+        // .or_else(if_expr)
+        // .or_else(fn_expr)
+        // .or_else(app)
+        // .or_else(tuple)
+        // .or_else(split_expr)
+        // .or_else(free_stmt)
+        .or_else(var)
+}
+#[cfg(test)]
+mod expr_test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(expr().parse("x"), Ok(("", Expr::Var("x".to_string()))));
+        assert_eq!(expr().parse("unx"), Ok(("", Expr::Var("unx".to_string()))));
+        assert_eq!(
+            expr().parse("linz"),
+            Ok(("", Expr::Var("linz".to_string())))
+        );
+        assert_eq!(
+            expr().parse("un true"),
+            Ok((
+                "",
+                Expr::QVal(QValExpr {
+                    qual: Qual::Un,
+                    val: ValExpr::Bool(true)
+                })
+            ))
+        );
+    }
 }
 
 fn prim_type<'a>() -> impl Parser<'a, PrimType> {
