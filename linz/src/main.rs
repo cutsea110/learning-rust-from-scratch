@@ -1,9 +1,10 @@
+extern crate parser_combinator;
+
 use std::{env, error::Error, fs};
 
 mod helper;
 mod lang;
 mod parser;
-mod parser_combinator;
 mod typing;
 
 fn main() -> Result<(), Box<dyn Error>> {

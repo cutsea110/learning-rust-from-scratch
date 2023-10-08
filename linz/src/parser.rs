@@ -26,7 +26,7 @@
 //! <P>     := bool | ( <T> * <T> ) | ( <T> -> <T> )
 //! ```
 use crate::lang::*;
-use crate::parser_combinator::*;
+use parser_combinator::*;
 
 pub fn parse_expr(i: &str) -> ParseResult<Expr> {
     let (i, _) = space0().parse(i)?;
