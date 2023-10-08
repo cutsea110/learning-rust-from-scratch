@@ -142,7 +142,7 @@ mod keyword {
     #[test]
     fn test() {
         assert_eq!(Ok(("", "let")), keyword("let").parse("let"));
-        assert_eq!(Ok(("", "&>")), keyword(">&").parse(">&"));
+        assert_eq!(Ok(("", ">&")), keyword(">&").parse(">&"));
         assert_eq!(Err("foo"), keyword("let").parse("foo"));
     }
 }
