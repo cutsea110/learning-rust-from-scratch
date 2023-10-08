@@ -108,8 +108,8 @@ impl fmt::Display for PrimType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PrimType::Bool => write!(f, "bool"),
-            PrimType::Pair(t1, t2) => write!(f, "{t1} * {t2}"),
-            PrimType::Arrow(t1, t2) => write!(f, "{t1} -> {t2}"),
+            PrimType::Pair(t1, t2) => write!(f, "({t1} * {t2})"),
+            PrimType::Arrow(t1, t2) => write!(f, "({t1} -> {t2})"),
         }
     }
 }
