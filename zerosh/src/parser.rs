@@ -37,8 +37,8 @@ mod exit_cmd {
     #[test]
     fn test() {
         assert_eq!(exit_cmd().parse("exit 1"), Ok(("", Some(1))));
-        assert_eq!(exit_cmd().parse("exit &"), Ok(("&", None)));
-        assert_eq!(exit_cmd().parse("exit |"), Ok(("|", None)));
+        assert_eq!(exit_cmd().parse("exit &"), Ok((" &", None)));
+        assert_eq!(exit_cmd().parse("exit |"), Ok((" |", None)));
     }
 }
 /// jobs command parser
@@ -146,7 +146,7 @@ mod built_in_cmd {
         );
         assert_eq!(
             built_in_cmd().parse("exit ;"),
-            Ok((";", BuiltInCmd::Exit(None)))
+            Ok((" ;", BuiltInCmd::Exit(None)))
         );
         assert_eq!(built_in_cmd().parse("jobs"), Ok(("", BuiltInCmd::Jobs)));
         assert_eq!(built_in_cmd().parse("fg 1"), Ok(("", BuiltInCmd::Fg(1))));
