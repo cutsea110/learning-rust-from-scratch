@@ -761,5 +761,8 @@ type CmdResult<'a> = Result<Vec<model::Job>, DynError>;
 
 /// コマンドをパース
 fn parse_cmd(line: &str) -> CmdResult {
-    parser::parse(line).map_err(Into::into)
+    match parser::parse(line) {
+        Ok((_, jobs)) => Ok(jobs),
+        Err(e) => Err(e.into()),
+    }
 }

@@ -5,3 +5,10 @@ version = 3
 [[package]]
 name = "linz"
 version = "0.1.0"
+dependencies = [
+ "parser-combinator",
+]
+
+[[package]]
+name = "parser-combinator"
+version = "0.1.0"

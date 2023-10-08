@@ -21,404 +21,14 @@
 use crate::model::*;
 use parser_combinator::*;
 
-/// tokenize command line
-fn tokenize(line: &str) -> Vec<(usize, String)> {
-    use std::mem::take;
-
-    let len = line.len();
-    let mut result = vec![];
-    let mut chars = line.chars().peekable();
-    let mut token = String::new();
-
-    while let Some(c) = chars.next() {
-        match c {
-            // 空白読み飛ばし
-            c if c.is_whitespace() => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-            }
-            // コマンドライン中のエスケープ(文字列の中ではなく)
-            '\\' => {
-                token.push('\\');
-                let c = chars.next().unwrap();
-                token.push(c);
-            }
-            // 文字列
-            '"' | '\'' => {
-                let quote = c; // クローズ用に取っておく
-
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-
-                token.push(quote);
-
-                while let Some(c) = chars.next() {
-                    if c == quote {
-                        token.push(quote);
-                        result.push((len - chars.clone().count() - token.len(), take(&mut token)));
-                        break;
-                    }
-                    match c {
-                        '\\' => {
-                            token.push('\\');
-                            token.push(chars.next().unwrap())
-                        }
-                        _ => token.push(c),
-                    }
-                }
-            }
-            // "&", "&&" の場合
-            c if c == '&' => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-
-                if let Some(&next_c) = chars.peek() {
-                    if next_c == c {
-                        chars.next();
-                        let cc = String::from_utf8(vec![c as u8, next_c as u8]).unwrap();
-                        result.push((len - chars.clone().count() - 2, cc));
-                        continue;
-                    }
-                }
-
-                result.push((len - chars.clone().count() - 1, c.to_string()));
-            }
-            // "|", "||", "|&" の場合
-            c if c == '|' => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-
-                if let Some(&next_c) = chars.peek() {
-                    if next_c == c || next_c == '&' {
-                        chars.next();
-                        let cc = String::from_utf8(vec![c as u8, next_c as u8]).unwrap();
-                        result.push((len - chars.clone().count() - 2, cc));
-                        continue;
-                    }
-                }
-
-                result.push((len - chars.clone().count() - 1, c.to_string()));
-            }
-            // ">", ">>", ">&" の場合
-            c if c == '>' => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-
-                if let Some(&next_c) = chars.peek() {
-                    if next_c == c || next_c == '&' {
-                        chars.next();
-                        let cc = String::from_utf8(vec![c as u8, next_c as u8]).unwrap();
-                        result.push((len - chars.clone().count() - 2, cc));
-                        continue;
-                    }
-                }
-
-                result.push((len - chars.clone().count() - 1, c.to_string()));
-            }
-            // これらは 1 文字トークン
-            '(' | ')' | ';' | '<' => {
-                if token.len() > 0 {
-                    result.push((
-                        len - chars.clone().count() - token.len() - 1,
-                        take(&mut token),
-                    ));
-                }
-                result.push((len - chars.clone().count() - 1, c.to_string()))
-            }
-            _ => token.push(c),
-        }
-    }
-    if token.len() > 0 {
-        result.push((len - chars.clone().count() - token.len(), token.to_string()));
-    }
-    result
-}
-#[cfg(test)]
-mod tokenize {
-    use super::*;
-
-    #[test]
-    fn test() {
-        assert_eq!(tokenize("foo"), vec![(0, "foo".to_string())]);
-        assert_eq!(tokenize(" foo"), vec![(1, "foo".to_string())]);
-        assert_eq!(tokenize("\tfoo"), vec![(1, "foo".to_string())]);
-        assert_eq!(tokenize("foo\0"), vec![(0, "foo\0".to_string())]);
-        assert_eq!(tokenize("foo\t"), vec![(0, "foo".to_string())]);
-        assert_eq!(tokenize("foo\n"), vec![(0, "foo".to_string())]);
-        assert_eq!(
-            tokenize("foo bar buz"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "bar".to_string()),
-                (8, "buz".to_string())
-            ]
-        );
-
-        assert_eq!(
-            tokenize("echo \"hello, world\""),
-            vec![(0, "echo".to_string()), (5, "\"hello, world\"".to_string())]
-        );
-        assert_eq!(
-            tokenize("echo 'hello, world'"),
-            vec![(0, "echo".to_string()), (5, "'hello, world'".to_string())]
-        );
-
-        assert_eq!(
-            tokenize("foo&"),
-            vec![(0, "foo".to_string()), (3, "&".to_string()),]
-        );
-        assert_eq!(
-            tokenize("foo & bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "&".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo& bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "&".to_string()),
-                (5, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo &bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "&".to_string()),
-                (5, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo&bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "&".to_string()),
-                (4, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo && bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "&&".to_string()),
-                (7, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo&& bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "&&".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo &&bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "&&".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo&&bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "&&".to_string()),
-                (5, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo & & bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "&".to_string()),
-                (6, "&".to_string()),
-                (8, "bar".to_string())
-            ]
-        );
-
-        assert_eq!(
-            tokenize("foo|"),
-            vec![(0, "foo".to_string()), (3, "|".to_string()),]
-        );
-        assert_eq!(
-            tokenize("foo | bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "|".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo| bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "|".to_string()),
-                (5, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo |bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "|".to_string()),
-                (5, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo|bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "|".to_string()),
-                (4, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo || bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "||".to_string()),
-                (7, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo|| bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "||".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo ||bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "||".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo||bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "||".to_string()),
-                (5, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo | | bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "|".to_string()),
-                (6, "|".to_string()),
-                (8, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo |& bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "|&".to_string()),
-                (7, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo|& bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "|&".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo |&bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "|&".to_string()),
-                (6, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo|&bar"),
-            vec![
-                (0, "foo".to_string()),
-                (3, "|&".to_string()),
-                (5, "bar".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo | & bar"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "|".to_string()),
-                (6, "&".to_string()),
-                (8, "bar".to_string())
-            ]
-        );
-
-        assert_eq!(
-            tokenize("echo \"test\'s\"|grep test"),
-            vec![
-                (0, "echo".to_string()),
-                (5, "\"test's\"".to_string()),
-                (13, "|".to_string()),
-                (14, "grep".to_string()),
-                (19, "test".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("echo test\\'s|grep test"),
-            vec![
-                (0, "echo".to_string()),
-                (5, "test\\'s".to_string()),
-                (12, "|".to_string()),
-                (13, "grep".to_string()),
-                (18, "test".to_string())
-            ]
-        );
-        assert_eq!(
-            tokenize("foo ./a | (bar; buz)"),
-            vec![
-                (0, "foo".to_string()),
-                (4, "./a".to_string()),
-                (8, "|".to_string()),
-                (10, "(".to_string()),
-                (11, "bar".to_string()),
-                (14, ";".to_string()),
-                (16, "buz".to_string()),
-                (19, ")".to_string())
-            ]
-        );
-    }
-}
-
 /// exit command parser
-fn exit_cmd() -> impl Parser<Output = Option<i32>> + Clone {
-    skip(literal("exit"), optional(int32()))
+fn exit_cmd<'a>() -> impl Parser<'a, Option<i32>> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+        let (next_i, _) = keyword("exit").parse(next_i)?;
+
+        opt(space1().skip(int32)).parse(next_i)
+    }
 }
 #[cfg(test)]
 mod exit_cmd {
@@ -426,23 +36,18 @@ mod exit_cmd {
 
     #[test]
     fn test() {
-        assert_eq!(
-            exit_cmd().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
-            vec![(Some(1), vec![].into())]
-        );
-        assert_eq!(
-            exit_cmd().parse(vec![(0, "exit".to_string()), (1, "&".to_string())].into()),
-            vec![(None, vec![(1, "&".to_string())].into())]
-        );
-        assert_eq!(
-            exit_cmd().parse(vec![(0, "exit".to_string()), (1, "|".to_string())].into()),
-            vec![(None, vec![(1, "|".to_string())].into())]
-        );
+        assert_eq!(exit_cmd().parse("exit 1"), Ok(("", Some(1))));
+        assert_eq!(exit_cmd().parse("exit &"), Ok(("&", None)));
+        assert_eq!(exit_cmd().parse("exit |"), Ok(("|", None)));
     }
 }
 /// jobs command parser
-fn jobs_cmd() -> impl Parser<Output = String> + Clone {
-    literal("jobs")
+fn jobs_cmd<'a>() -> impl Parser<'a, &'a str> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+
+        keyword("jobs").parse(next_i)
+    }
 }
 #[cfg(test)]
 mod jobs_cmd {
@@ -450,23 +55,20 @@ mod jobs_cmd {
 
     #[test]
     fn test() {
-        assert_eq!(
-            jobs_cmd().parse(vec![(0, "jobs".to_string())].into()),
-            vec![("jobs".to_string(), vec![].into())]
-        );
-        assert_eq!(
-            jobs_cmd().parse(vec![(0, "jobs".to_string()), (1, "&".to_string())].into()),
-            vec![("jobs".to_string(), vec![(1, "&".to_string())].into())]
-        );
-        assert_eq!(
-            jobs_cmd().parse(vec![(0, "jobs".to_string()), (1, "|".to_string())].into()),
-            vec![("jobs".to_string(), vec![(1, "|".to_string())].into())]
-        );
+        assert_eq!(jobs_cmd().parse("jobs"), Ok(("", "jobs")));
+        assert_eq!(jobs_cmd().parse("jobs &"), Ok((" &", "jobs")));
+        assert_eq!(jobs_cmd().parse("jobs |"), Ok((" |", "jobs")));
     }
 }
 /// fg command parser
-fn fg_cmd() -> impl Parser<Output = i32> + Clone {
-    skip(literal("fg"), int32())
+fn fg_cmd<'a>() -> impl Parser<'a, i32> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+        let (next_i, _) = keyword("fg").parse(next_i)?;
+        let (next_i, _) = space1().parse(next_i)?;
+
+        int32(next_i)
+    }
 }
 #[cfg(test)]
 mod fg_cmd {
@@ -474,45 +76,43 @@ mod fg_cmd {
 
     #[test]
     fn test() {
-        assert_eq!(
-            fg_cmd().parse(vec![(0, "fg".to_string()), (1, "1".to_string())].into()),
-            vec![(1, vec![].into())]
-        );
-        assert_eq!(
-            fg_cmd().parse(vec![(0, "fg".to_string()), (1, "&".to_string())].into()),
-            vec![]
-        );
-        assert_eq!(
-            fg_cmd().parse(vec![(0, "fg".to_string()), (1, "|".to_string())].into()),
-            vec![]
-        );
+        assert_eq!(fg_cmd().parse("fg 1"), Ok(("", 1)));
+        assert_eq!(fg_cmd().parse("fg &"), Err("&"));
+        assert_eq!(fg_cmd().parse("fg |"), Err("|"));
     }
 }
 /// directory name parser
-fn dir_name() -> impl Parser<Output = String> + Clone {
-    satisfy(|s| !s.chars().any(|c| "&|();<>".contains(c)))
+fn path_name<'a>() -> impl Parser<'a, String> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+
+        any_char
+            .pred(|c| !"&|();<>".contains(*c) && !c.is_whitespace())
+            .many1()
+            .map(|s| s.into_iter().collect::<String>())
+            .parse(next_i)
+    }
 }
 #[cfg(test)]
-mod dir_name {
+mod path_name {
     use super::*;
 
     #[test]
     fn test() {
-        assert_eq!(
-            dir_name().parse(vec![(0, "a".to_string())].into()),
-            vec![("a".to_string(), vec![].into())]
-        );
-        assert_eq!(
-            dir_name().parse(vec![(0, "./a".to_string())].into()),
-            vec![("./a".to_string(), vec![].into())]
-        );
-        assert_eq!(dir_name().parse(vec![(0, "&".to_string())].into()), vec![]);
-        assert_eq!(dir_name().parse(vec![(0, "|".to_string())].into()), vec![]);
+        assert_eq!(path_name().parse("a"), Ok(("", "a".to_string())));
+        assert_eq!(path_name().parse("./a"), Ok(("", "./a".to_string())));
+        assert_eq!(path_name().parse("&"), Err("&"));
+        assert_eq!(path_name().parse("|"), Err("|"));
     }
 }
 /// cd command parser
-fn cd_cmd() -> impl Parser<Output = Option<String>> + Clone {
-    skip(literal("cd"), optional(dir_name()))
+fn cd_cmd<'a>() -> impl Parser<'a, Option<String>> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+        let (next_i, _) = keyword("cd").parse(next_i)?;
+
+        opt(path_name()).parse(next_i)
+    }
 }
 #[cfg(test)]
 mod cd_cmd {
@@ -520,36 +120,19 @@ mod cd_cmd {
 
     #[test]
     fn test() {
-        assert_eq!(
-            cd_cmd().parse(vec![(0, "cd".to_string())].into()),
-            vec![(None, vec![].into())]
-        );
-        assert_eq!(
-            cd_cmd().parse(vec![(0, "cd".to_string()), (1, "./a".to_string())].into()),
-            vec![(Some("./a".to_string()), vec![].into())]
-        );
-        assert_eq!(
-            cd_cmd().parse(vec![(0, "cd".to_string()), (1, "&".to_string())].into()),
-            vec![(None, vec![(1, "&".to_string())].into())]
-        );
-        assert_eq!(
-            cd_cmd().parse(vec![(0, "cd".to_string()), (1, "|".to_string())].into()),
-            vec![(None, vec![(1, "|".to_string())].into())]
-        );
+        assert_eq!(cd_cmd().parse("cd"), Ok(("", None)));
+        assert_eq!(cd_cmd().parse("cd ./a"), Ok(("", Some("./a".to_string()))));
+        assert_eq!(cd_cmd().parse("cd &"), Ok((" &", None)));
+        assert_eq!(cd_cmd().parse("cd |"), Ok((" |", None)));
     }
 }
 /// built-in command parser
-fn built_in_cmd() -> impl Parser<Output = BuiltInCmd> + Clone {
-    altl(
-        apply(exit_cmd(), BuiltInCmd::Exit),
-        altl(
-            apply(jobs_cmd(), |_| BuiltInCmd::Jobs),
-            altl(
-                apply(fg_cmd(), BuiltInCmd::Fg),
-                apply(cd_cmd(), BuiltInCmd::Cd),
-            ),
-        ),
-    )
+fn built_in_cmd<'a>() -> impl Parser<'a, BuiltInCmd> {
+    exit_cmd()
+        .map(BuiltInCmd::Exit)
+        .or_else(jobs_cmd().map(|_| BuiltInCmd::Jobs))
+        .or_else(fg_cmd().map(BuiltInCmd::Fg))
+        .or_else(cd_cmd().map(BuiltInCmd::Cd))
 }
 #[cfg(test)]
 mod built_in_cmd {
@@ -558,75 +141,40 @@ mod built_in_cmd {
     #[test]
     fn test() {
         assert_eq!(
-            built_in_cmd().parse(vec![(0, "exit".to_string()), (1, "1".to_string())].into()),
-            vec![(BuiltInCmd::Exit(Some(1)), vec![].into())]
+            built_in_cmd().parse("exit 1"),
+            Ok(("", BuiltInCmd::Exit(Some(1))))
         );
         assert_eq!(
-            built_in_cmd().parse(vec![(0, "exit".to_string()), (1, ";".to_string())].into()),
-            vec![(BuiltInCmd::Exit(None), vec![(1, ";".to_string())].into())]
+            built_in_cmd().parse("exit ;"),
+            Ok((";", BuiltInCmd::Exit(None)))
+        );
+        assert_eq!(built_in_cmd().parse("jobs"), Ok(("", BuiltInCmd::Jobs)));
+        assert_eq!(built_in_cmd().parse("fg 1"), Ok(("", BuiltInCmd::Fg(1))));
+        assert_eq!(
+            built_in_cmd().parse("cd ~/app"),
+            Ok(("", BuiltInCmd::Cd(Some("~/app".to_string()))))
         );
         assert_eq!(
-            built_in_cmd().parse(vec![(0, "jobs".to_string())].into()),
-            vec![(BuiltInCmd::Jobs, vec![].into())]
-        );
-        assert_eq!(
-            built_in_cmd().parse(vec![(0, "fg".to_string()), (1, "1".to_string())].into()),
-            vec![(BuiltInCmd::Fg(1), vec![].into())]
-        );
-        assert_eq!(
-            built_in_cmd().parse(vec![(0, "cd".to_string()), (1, "~/app".to_string())].into()),
-            vec![(BuiltInCmd::Cd(Some("~/app".to_string())), vec![].into())]
+            built_in_cmd().parse("exit 1; (ls -laF | grep 'a')& cd ~/app"),
+            Ok((
+                "; (ls -laF | grep 'a')& cd ~/app",
+                BuiltInCmd::Exit(Some(1))
+            ))
         );
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test() {
-        assert_eq!(
-            built_in_cmd().parse(tokenize("exit 1; (ls -laF | grep 'a')& cd ~/app").into()),
-            vec![(
-                BuiltInCmd::Exit(Some(1)),
-                vec![
-                    (6, ";".to_string()),
-                    (8, "(".to_string()),
-                    (9, "ls".to_string()),
-                    (12, "-laF".to_string()),
-                    (17, "|".to_string()),
-                    (19, "grep".to_string()),
-                    (24, "'a'".to_string()),
-                    (27, ")".to_string()),
-                    (28, "&".to_string()),
-                    (30, "cd".to_string()),
-                    (33, "~/app".to_string())
-                ]
-                .into()
-            )]
-        );
-    }
-}
-
-fn is_separator(s: String) -> bool {
-    vec![
-        "&".to_string(),
-        "|".to_string(),
-        "|&".to_string(),
-        "(".to_string(),
-        ")".to_string(),
-        ";".to_string(),
-        "<".to_string(),
-        ">".to_string(),
-        ">&".to_string(),
-        ">>".to_string(),
-    ]
-    .contains(&s)
-}
 /// symbol parser
-fn symbol() -> impl Parser<Output = String> + Clone {
-    satisfy(|s| !is_separator(s))
+fn symbol<'a>() -> impl Parser<'a, String> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+
+        any_char
+            .pred(|c| !"&|()<>;".contains(*c) && !c.is_whitespace())
+            .many1()
+            .map(|cs| cs.into_iter().collect::<String>())
+            .parse(next_i)
+    }
 }
 #[cfg(test)]
 mod symbol {
@@ -634,31 +182,32 @@ mod symbol {
 
     #[test]
     fn test() {
-        assert_eq!(
-            symbol().parse(vec![(0, "ls".to_string())].into()),
-            vec![("ls".to_string(), vec![].into())]
-        );
-        assert_eq!(
-            symbol().parse(vec![(0, "ls".to_string()), (1, "-laF".to_string())].into()),
-            vec![("ls".to_string(), vec![(1, "-laF".to_string())].into())]
-        );
-        assert_eq!(symbol().parse(vec![(0, "&".to_string())].into()), vec![]);
-        assert_eq!(symbol().parse(vec![(0, "|".to_string())].into()), vec![]);
+        assert_eq!(symbol().parse("ls"), Ok(("", "ls".to_string())));
+        assert_eq!(symbol().parse("ls -laF"), Ok((" -laF", "ls".to_string())));
+        assert_eq!(symbol().parse("&"), Err("&"));
+        assert_eq!(symbol().parse("|"), Err("|"));
     }
 }
 
-fn redirect() -> impl Parser<Output = Redirection> + Clone {
-    bind(
-        altl(altl(literal(">"), literal(">&")), literal(">>")),
-        |r| {
-            apply(symbol(), move |file| match r.as_str() {
-                ">" => Redirection::StdOut(file),
-                ">&" => Redirection::Both(file),
-                ">>" => Redirection::Append(file),
-                _ => unreachable!(),
-            })
-        },
-    )
+fn redirect<'a>() -> impl Parser<'a, Redirection> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+        let (next_i, tok) = keyword(">&")
+            .or_else(keyword(">>"))
+            .or_else(keyword(">")) // 短いのを最後にしないと全部 '>' にマッチしてしまう
+            .parse(next_i)?;
+        let (next_i, _) = space0().parse(next_i)?;
+        let (next_i, file) = path_name().parse(next_i)?;
+
+        let red = match tok {
+            ">" => Redirection::StdOut(file),
+            ">&" => Redirection::Both(file),
+            ">>" => Redirection::Append(file),
+            _ => unreachable!(),
+        };
+
+        Ok((next_i, red))
+    }
 }
 #[cfg(test)]
 mod redirect {
@@ -667,20 +216,20 @@ mod redirect {
     #[test]
     fn test() {
         assert_eq!(
-            redirect().parse(vec![(0, ">".to_string()), (1, "a.txt".to_string())].into()),
-            vec![(Redirection::StdOut("a.txt".to_string()), vec![].into())]
+            redirect().parse("> a.txt"),
+            Ok(("", Redirection::StdOut("a.txt".to_string())))
         );
         assert_eq!(
-            redirect().parse(vec![(0, ">&".to_string()), (1, "a.txt".to_string())].into()),
-            vec![(Redirection::Both("a.txt".to_string()), vec![].into())]
+            redirect().parse(">& a.txt"),
+            Ok(("", Redirection::Both("a.txt".to_string())))
         );
     }
 }
 
 /// external command parser
-fn external_cmd() -> impl Parser<Output = ExternalCmd> + Clone {
-    bind(munch1(symbol()), |args| {
-        apply(optional(redirect()), move |out| ExternalCmd {
+fn external_cmd<'a>() -> impl Parser<'a, ExternalCmd> {
+    symbol().many1().and_then(|args| {
+        opt(redirect()).map(move |out| ExternalCmd {
             args: args.clone(),
             redirect: out,
         })
@@ -693,60 +242,51 @@ mod external_cmd {
     #[test]
     fn test() {
         assert_eq!(
-            external_cmd().parse(vec![(0, "ls".to_string()), (1, "-laF".to_string())].into()),
-            vec![(
+            external_cmd().parse("ls -laF"),
+            Ok((
+                "",
                 ExternalCmd {
                     args: vec!["ls".to_string(), "-laF".to_string()],
                     redirect: None,
-                },
-                vec![].into()
-            )]
+                }
+            ))
         );
         assert_eq!(
-            external_cmd().parse(
-                vec![
-                    (0, "ls".to_string()),
-                    (1, "-laF".to_string()),
-                    (2, "|".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            external_cmd().parse("ls -laF |"),
+            Ok((
+                " |",
                 ExternalCmd {
                     args: vec!["ls".to_string(), "-laF".to_string()],
                     redirect: None,
-                },
-                vec![(2, "|".to_string())].into()
-            )]
+                }
+            ))
         );
         assert_eq!(
-            external_cmd().parse(
-                vec![
-                    (0, "ls".to_string()),
-                    (1, "-laF".to_string()),
-                    (2, ">".to_string()),
-                    (3, "a.log".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            external_cmd().parse("ls -laF > a.log"),
+            Ok((
+                "",
                 ExternalCmd {
                     args: vec!["ls".to_string(), "-laF".to_string()],
                     redirect: Some(Redirection::StdOut("a.log".to_string())),
-                },
-                vec![].into()
-            )]
+                }
+            ))
         );
     }
 }
 
 /// pipe control simbol parser
-fn pipe() -> impl Parser<Output = Pipe> + Clone {
-    apply(altl(literal("|"), literal("|&")), |p| match p.as_str() {
-        "|" => Pipe::StdOut,
-        "|&" => Pipe::Both,
-        _ => unreachable!(),
-    })
+fn pipe<'a>() -> impl Parser<'a, Pipe> {
+    |input| {
+        let (next_i, _) = space0().parse(input)?;
+        // '|' は最後にしないとなんでも '|' にマッチしてしまう
+        let (next_i, p) = keyword("|&").or_else(keyword("|")).parse(next_i)?;
+
+        match p {
+            "|" => Ok((next_i, Pipe::StdOut)),
+            "|&" => Ok((next_i, Pipe::Both)),
+            _ => unreachable!(),
+        }
+    }
 }
 #[cfg(test)]
 mod pipe {
@@ -754,31 +294,26 @@ mod pipe {
 
     #[test]
     fn test() {
-        assert_eq!(
-            pipe().parse(vec![(0, "|".to_string())].into()),
-            vec![(Pipe::StdOut, vec![].into())]
-        );
-        assert_eq!(
-            pipe().parse(vec![(0, "|&".to_string())].into()),
-            vec![(Pipe::Both, vec![].into())]
-        );
+        assert_eq!(pipe().parse("|"), Ok(("", Pipe::StdOut)));
+        assert_eq!(pipe().parse("|&"), Ok(("", Pipe::Both)));
     }
 }
 
 /// pipeline parser
-fn pipeline() -> impl Parser<Output = Pipeline> + Clone {
-    bind(external_cmd(), move |cmd| {
-        apply(munch(tuple(pipe(), external_cmd())), move |cmds| {
-            let mut acc = Pipeline::Src(cmd.clone());
-            for (p, cmd) in cmds {
-                acc = match &p {
-                    Pipe::StdOut => Pipeline::Out(Box::new(acc), cmd),
-                    Pipe::Both => Pipeline::Both(Box::new(acc), cmd),
-                };
-            }
-            acc
-        })
-    })
+fn pipeline<'a>() -> impl Parser<'a, Pipeline> {
+    |input| {
+        let (next_i, cmd) = external_cmd().parse(input)?;
+        let (next_i, cmds) = pipe().join(external_cmd()).many0().parse(next_i)?;
+
+        let mut acc = Pipeline::Src(cmd.clone());
+        for (p, cmd) in cmds {
+            acc = match &p {
+                Pipe::StdOut => Pipeline::Out(Box::new(acc), cmd),
+                Pipe::Both => Pipeline::Both(Box::new(acc), cmd),
+            };
+        }
+        Ok((next_i, acc))
+    }
 }
 #[cfg(test)]
 mod pipeline {
@@ -787,15 +322,9 @@ mod pipeline {
     #[test]
     fn test() {
         assert_eq!(
-            pipeline().parse(
-                vec![
-                    (0, "foo".to_string()),
-                    (1, "|".to_string()),
-                    (2, "bar".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            pipeline().parse("foo | bar"),
+            Ok((
+                "",
                 Pipeline::Out(
                     Box::new(Pipeline::Src(ExternalCmd {
                         args: vec!["foo".to_string()],
@@ -805,20 +334,13 @@ mod pipeline {
                         args: vec!["bar".to_string()],
                         redirect: None,
                     }
-                ),
-                vec![].into()
-            )]
+                )
+            ))
         );
         assert_eq!(
-            pipeline().parse(
-                vec![
-                    (0, "foo".to_string()),
-                    (1, "|&".to_string()),
-                    (2, "bar".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            pipeline().parse("foo |& bar"),
+            Ok((
+                "",
                 Pipeline::Both(
                     Box::new(Pipeline::Src(ExternalCmd {
                         args: vec!["foo".to_string()],
@@ -828,22 +350,13 @@ mod pipeline {
                         args: vec!["bar".to_string()],
                         redirect: None,
                     }
-                ),
-                vec![].into()
-            )]
+                )
+            ))
         );
         assert_eq!(
-            pipeline().parse(
-                vec![
-                    (0, "foo".to_string()),
-                    (1, "|".to_string()),
-                    (2, "bar".to_string()),
-                    (3, "|&".to_string()),
-                    (4, "buz".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            pipeline().parse("foo | bar |& buz"),
+            Ok((
+                "",
                 Pipeline::Both(
                     Box::new(Pipeline::Out(
                         Box::new(Pipeline::Src(ExternalCmd {
@@ -859,30 +372,27 @@ mod pipeline {
                         args: vec!["buz".to_string()],
                         redirect: None,
                     }
-                ),
-                vec![].into()
-            )]
+                )
+            ))
         );
     }
 }
 
 /// job parser
-fn job() -> impl Parser<Output = Job> + Clone {
-    altl(
-        // NOTE: external としてパースされないよう built_in_cmd を先にする
-        bind(built_in_cmd(), |cmd| {
-            apply(optional(literal("&")), move |bg| Job::BuiltIn {
+fn job<'a>() -> impl Parser<'a, Job> {
+    built_in_cmd()
+        .and_then(|cmd| {
+            lexeme(opt(literal("&"))).map(move |bg| Job::BuiltIn {
                 cmd: cmd.clone(),
                 is_bg: bg.is_some(),
             })
-        }),
-        bind(pipeline(), |cmds| {
-            apply(optional(literal("&")), move |bg| Job::External {
+        })
+        .or_else(pipeline().and_then(|cmds| {
+            lexeme(opt(literal("&"))).map(move |bg| Job::External {
                 cmds: cmds.clone(),
                 is_bg: bg.is_some(),
             })
-        }),
-    )
+        }))
 }
 #[cfg(test)]
 mod job {
@@ -891,17 +401,9 @@ mod job {
     #[test]
     fn fg_job() {
         assert_eq!(
-            job().parse(
-                vec![
-                    (0, "ls".to_string()),
-                    (1, "-laF".to_string()),
-                    (2, "|".to_string()),
-                    (3, "grep".to_string()),
-                    (4, "'a'".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            job().parse("ls -laF | grep a"),
+            Ok((
+                "",
                 Job::External {
                     cmds: Pipeline::Out(
                         Box::new(Pipeline::Src(ExternalCmd {
@@ -909,56 +411,82 @@ mod job {
                             redirect: None,
                         })),
                         ExternalCmd {
-                            args: vec!["grep".to_string(), "'a'".to_string()],
+                            args: vec!["grep".to_string(), "a".to_string()],
                             redirect: None,
                         }
                     ),
                     is_bg: false,
-                },
-                vec![].into()
-            )]
+                }
+            ))
         );
         assert_eq!(
-            job().parse(
-                vec![
-                    (0, "exit".to_string()),
-                    (1, "42".to_string()),
-                    (2, "|".to_string()),
-                    (3, "grep".to_string()),
-                    (4, "'a'".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            job().parse("exit 42 | grep a"),
+            Ok((
+                "| grep a",
                 Job::BuiltIn {
                     cmd: BuiltInCmd::Exit(Some(42)),
                     is_bg: false,
-                },
-                vec![
-                    (2, "|".to_string()),
-                    (3, "grep".to_string()),
-                    (4, "'a'".to_string())
-                ]
-                .into()
-            )]
+                }
+            ))
+        );
+        assert_eq!(
+            job().parse("exit"),
+            Ok((
+                "",
+                Job::BuiltIn {
+                    cmd: BuiltInCmd::Exit(None),
+                    is_bg: false,
+                }
+            ))
+        );
+        assert_eq!(
+            job().parse("jobs"),
+            Ok((
+                "",
+                Job::BuiltIn {
+                    cmd: BuiltInCmd::Jobs,
+                    is_bg: false,
+                }
+            ))
+        );
+        assert_eq!(
+            job().parse("fg 1"),
+            Ok((
+                "",
+                Job::BuiltIn {
+                    cmd: BuiltInCmd::Fg(1),
+                    is_bg: false,
+                }
+            ))
+        );
+        assert_eq!(
+            job().parse("cd"),
+            Ok((
+                "",
+                Job::BuiltIn {
+                    cmd: BuiltInCmd::Cd(None),
+                    is_bg: false,
+                }
+            ))
+        );
+        assert_eq!(
+            job().parse("cd ./app"),
+            Ok((
+                "",
+                Job::BuiltIn {
+                    cmd: BuiltInCmd::Cd(Some("./app".to_string())),
+                    is_bg: false,
+                }
+            ))
         );
     }
 
     #[test]
     fn bg_job() {
         assert_eq!(
-            job().parse(
-                vec![
-                    (0, "ls".to_string()),
-                    (1, "-laF".to_string()),
-                    (2, "|".to_string()),
-                    (3, "grep".to_string()),
-                    (4, "'a'".to_string()),
-                    (5, "&".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            job().parse("ls -laF | grep a &"),
+            Ok((
+                "",
                 Job::External {
                     cmds: Pipeline::Out(
                         Box::new(Pipeline::Src(ExternalCmd {
@@ -966,45 +494,29 @@ mod job {
                             redirect: None,
                         })),
                         ExternalCmd {
-                            args: vec!["grep".to_string(), "'a'".to_string()],
+                            args: vec!["grep".to_string(), "a".to_string()],
                             redirect: None,
                         }
                     ),
                     is_bg: true,
-                },
-                vec![].into()
-            )]
+                }
+            ))
         );
         assert_eq!(
-            job().parse(
-                vec![
-                    (0, "exit".to_string()),
-                    (1, "42".to_string()),
-                    (2, "&".to_string()),
-                    (3, "grep".to_string()),
-                    (4, "'a'".to_string()),
-                    (5, "&".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            job().parse("exit 42 & grep a &"),
+            Ok((
+                " grep a &",
                 Job::BuiltIn {
                     cmd: BuiltInCmd::Exit(Some(42)),
                     is_bg: true,
-                },
-                vec![
-                    (3, "grep".to_string()),
-                    (4, "'a'".to_string()),
-                    (5, "&".to_string())
-                ]
-                .into()
-            )]
+                }
+            ))
         );
     }
 }
 /// command line parser
-fn parse_cmd() -> impl Parser<Output = Vec<Job>> + Clone {
-    munch(job())
+fn parse_cmd<'a>() -> impl Parser<'a, Vec<Job>> {
+    job().many0()
 }
 #[cfg(test)]
 mod parse_cmd {
@@ -1013,36 +525,22 @@ mod parse_cmd {
     #[test]
     fn test() {
         assert_eq!(
-            parse_cmd().parse(
-                vec![
-                    (0, "ls".to_string()),
-                    (1, "-laF".to_string()),
-                    (2, "|".to_string()),
-                    (3, "grep".to_string()),
-                    (4, "'a'".to_string()),
-                    (5, "&".to_string()),
-                    (6, "cd".to_string()),
-                    (7, "~/app".to_string()),
-                    (8, "&".to_string()),
-                    (9, "exit".to_string()),
-                    (10, "1".to_string())
-                ]
-                .into()
-            ),
-            vec![(
+            parse_cmd().parse("ls -laF | grep a & cd ~/app & exit 1"),
+            Ok((
+                "",
                 vec![
                     Job::External {
                         cmds: Pipeline::Out(
                             Box::new(Pipeline::Src(ExternalCmd {
                                 args: vec!["ls".to_string(), "-laF".to_string()],
-                                redirect: None
+                                redirect: None,
                             })),
                             ExternalCmd {
-                                args: vec!["grep".to_string(), "'a'".to_string()],
-                                redirect: None
+                                args: vec!["grep".to_string(), "a".to_string()],
+                                redirect: None,
                             }
                         ),
-                        is_bg: true
+                        is_bg: true,
                     },
                     Job::BuiltIn {
                         cmd: BuiltInCmd::Cd(Some("~/app".to_string())),
@@ -1051,42 +549,14 @@ mod parse_cmd {
                     Job::BuiltIn {
                         cmd: BuiltInCmd::Exit(Some(1)),
                         is_bg: false
-                    }
-                ],
-                vec![].into()
-            )]
+                    },
+                ]
+            ))
         );
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ParseError {
-    Invalid,
-    Unknown,
-}
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ParseError::Invalid => write!(f, "invalid"),
-            ParseError::Unknown => write!(f, "unknown"),
-        }
-    }
-}
-impl std::error::Error for ParseError {}
-
 /// parsing
-pub fn parse(line: &str) -> Result<Vec<Job>, ParseError> {
-    let tokens = tokenize(line);
-    let mut jobs = parse_cmd().parse(tokens.into());
-
-    match jobs.pop() {
-        Some((jobs, rest)) => {
-            if rest.is_empty() {
-                Ok(jobs)
-            } else {
-                Err(ParseError::Unknown)
-            }
-        }
-        None => Err(ParseError::Invalid),
-    }
+pub fn parse<'a>(input: &'a str) -> ParseResult<'a, Vec<Job>> {
+    parse_cmd().parse(input)
 }
