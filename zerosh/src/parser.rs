@@ -86,6 +86,7 @@ fn path_name<'a>() -> impl Parser<'a, String> {
     |input| {
         let (next_i, _) = space0().parse(input)?;
 
+        // TODO: ファイルパス名の構文を調べて実装する
         any_char
             .pred(|c| !"&|()<>;".contains(*c) && !c.is_whitespace())
             .many1()
