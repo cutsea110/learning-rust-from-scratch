@@ -146,8 +146,7 @@ fn typing_qval<'a>(expr: &lang::QValExpr, env: &mut TypeEnv, depth: usize) -> TR
             let t1 = typing(e1, env, depth)?;
             let t2 = typing(e2, env, depth)?;
 
-            // expr.qual が Un であり
-            // e1 か e2 の型に lin が含まれていた場合は型付けエラー
+            // un 型のペアは lin 型の値を内包できないという制約がある
             if expr.qual == lang::Qual::Un
                 && (t1.qual == lang::Qual::Lin || t2.qual == lang::Qual::Lin)
             {
@@ -160,15 +159,18 @@ fn typing_qval<'a>(expr: &lang::QValExpr, env: &mut TypeEnv, depth: usize) -> TR
         lang::ValExpr::Fun(e) => {
             // 関数の型付け
 
-            // un 型の関数内では, lin 型の自由変数をキャプチャできないため
-            // lin 用の型環境を置き換え
+            // un 型の関数の場合, この関数の外側で定義された lin 型の変数は利用できない
+            // そのため lin 用の型環境を空にする
+            // ただし, あとで環境を復元する必要があるので退避しておく
+            // これが lin と un で型環境を別に用意し, BTreeMap でスタックを実装した理由である
             let env_prev = if expr.qual == lang::Qual::Un {
                 Some(mem::take(&mut env.env_lin))
             } else {
                 None
             };
 
-            // depth をインクリメントして push
+            // 型環境のスタックをインクリメントする
+            // スタックのプッシュには depth が必要なので忘れずにインクリメントする
             let mut depth = depth;
             safe_add(&mut depth, &1, || "変数スコープのネストが深すぎる")?;
             env.push(depth);
@@ -177,7 +179,10 @@ fn typing_qval<'a>(expr: &lang::QValExpr, env: &mut TypeEnv, depth: usize) -> TR
             // 関数中の式を型付け
             let t = typing(&e.expr, env, depth)?;
 
-            // スタックを pop し, pop した型環境の中に lin 型が含まれていた場合は型付けエラー
+            // スタックを pop し, pop した型環境の中に lin 型が含まれていた場合は
+            // 消費されなかったということなのでエラー
+            // このように型環境をスタックにすることで変数のスコープが表現されている
+            // また get_mut をスタック上位から下位に向かって検索するようにしたことでシャドウイングを実現
             let (elin, _) = env.pop(depth);
             for (k, v) in elin.unwrap().iter() {
                 if v.is_some() {
@@ -185,7 +190,7 @@ fn typing_qval<'a>(expr: &lang::QValExpr, env: &mut TypeEnv, depth: usize) -> TR
                 }
             }
 
-            // lin 用の型環境を復元
+            // 上で退避していた lin 用の型環境を復元
             if let Some(ep) = env_prev {
                 env.env_lin = ep;
             }
@@ -225,6 +230,8 @@ fn typing_if<'a>(expr: &lang::IfExpr, env: &mut TypeEnv, depth: usize) -> TResul
         return Err("ifの条件式がboolでない".into());
     }
 
+    // then と else で別々の式を同じ型環境で検査するため
+    // 型環境を clone しえｔからそれぞれの式の型付けを行う
     let mut e = env.clone();
     let t2 = typing(&expr.then_expr, &mut e, depth)?;
     let t3 = typing(&expr.else_expr, env, depth)?;
@@ -240,6 +247,7 @@ fn typing_if<'a>(expr: &lang::IfExpr, env: &mut TypeEnv, depth: usize) -> TResul
 
 /// split 式の型付け
 fn typing_split<'a>(expr: &lang::SplitExpr, env: &mut TypeEnv, depth: usize) -> TResult<'a> {
+    // 同じ変数名は使えない
     if expr.left == expr.right {
         return Err("splitの変数名が同じ".into());
     }
@@ -262,10 +270,11 @@ fn typing_split<'a>(expr: &lang::SplitExpr, env: &mut TypeEnv, depth: usize) -> 
 
     let ret = typing(&expr.body, env, depth);
 
-    // ローカル変数を削除
+    // 型環境をポップする(ローカル変数を削除)
     let (elin, _) = env.pop(depth);
 
-    // lin 型の変数を消費しているかチェック
+    // ポップした型環境の中に lin 型の変数が残っていないかをチェック
+    // 残っていたら消費していない lin 型の値があるということなのでエラー
     for (k, v) in elin.unwrap().iter() {
         if v.is_some() {
             return Err(format!(r#"splitの式内でlin型の変数"{k}"を消費していない"#).into());
