@@ -247,7 +247,7 @@ fn typing_if<'a>(expr: &lang::IfExpr, env: &mut TypeEnv, depth: usize) -> TResul
 
 /// split 式の型付け
 fn typing_split<'a>(expr: &lang::SplitExpr, env: &mut TypeEnv, depth: usize) -> TResult<'a> {
-    // 同じ変数名は使えない
+    // 同じ変数名は使えない制約がある
     if expr.left == expr.right {
         return Err("splitの変数名が同じ".into());
     }
@@ -328,7 +328,8 @@ fn typing_let<'a>(expr: &lang::LetExpr, env: &mut TypeEnv, depth: usize) -> TRes
     env.insert(expr.var.clone(), t1); // 変数の型を insert
     let t2 = typing(&expr.expr2, env, depth)?;
 
-    // lin 型の変数を消費しているかチェック
+    // ポップした型環境の中に lin 型の変数が残っていないかをチェック
+    // 残っていたら消費していない lin 型の値があるということなのでエラー
     let (elin, _) = env.pop(depth);
     for (k, v) in elin.unwrap().iter() {
         if v.is_some() {
