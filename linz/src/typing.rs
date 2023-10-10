@@ -291,13 +291,16 @@ fn typing_var<'a>(expr: &str, env: &mut TypeEnv, depth: usize) -> TResult<'a> {
         // 定義されている
         if let Some(t) = it {
             // 消費されていない
-            if t.qual == lang::Qual::Lin {
-                // lin 型
-                let eret = t.clone();
-                *it = None; // lin を消費
-                return Ok(eret);
-            } else {
-                return Ok(t.clone());
+            match t.qual {
+                lang::Qual::Lin => {
+                    // lin 型
+                    let eret = t.clone();
+                    *it = None; // lin を消費
+                    return Ok(eret);
+                }
+                lang::Qual::Un => {
+                    return Ok(t.clone());
+                }
             }
         }
     }
