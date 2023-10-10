@@ -231,7 +231,7 @@ fn typing_if<'a>(expr: &lang::IfExpr, env: &mut TypeEnv, depth: usize) -> TResul
     }
 
     // then と else で別々の式を同じ型環境で検査するため
-    // 型環境を clone しえｔからそれぞれの式の型付けを行う
+    // 型環境を clone してからそれぞれの式の型付けを行う
     let mut e = env.clone();
     let t2 = typing(&expr.then_expr, &mut e, depth)?;
     let t3 = typing(&expr.else_expr, env, depth)?;
