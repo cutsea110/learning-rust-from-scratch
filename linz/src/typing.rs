@@ -135,6 +135,58 @@ fn typing_app<'a>(expr: &lang::AppExpr, env: &mut TypeEnv, depth: usize) -> TRes
         Err("関数適用時における引数の型が異なる".into())
     }
 }
+#[cfg(test)]
+mod typing_app {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let mut env = TypeEnv::new();
+        let expr = lang::AppExpr {
+            expr1: Box::new(lang::Expr::Var("f".to_string())),
+            expr2: Box::new(lang::Expr::Var("x".to_string())),
+        };
+
+        // new stack
+        env.push(0);
+
+        // f: lin (lin bool -> lin bool)
+        env.insert(
+            "f".to_string(),
+            lang::TypeExpr {
+                prim: lang::PrimType::Arrow(
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Lin,
+                        prim: lang::PrimType::Bool,
+                    }),
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Lin,
+                        prim: lang::PrimType::Bool,
+                    }),
+                ),
+                qual: lang::Qual::Lin,
+            },
+        );
+
+        // x: lin int
+        env.insert(
+            "x".to_string(),
+            lang::TypeExpr {
+                qual: lang::Qual::Lin,
+                prim: lang::PrimType::Bool,
+            },
+        );
+
+        let result = typing_app(&expr, &mut env, 0);
+        assert_eq!(
+            result,
+            Ok(lang::TypeExpr {
+                prim: lang::PrimType::Bool,
+                qual: lang::Qual::Lin,
+            })
+        );
+    }
+}
 
 /// 修飾子付き値の型付け
 fn typing_qval<'a>(expr: &lang::QValExpr, env: &mut TypeEnv, depth: usize) -> TResult<'a> {
