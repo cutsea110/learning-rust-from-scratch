@@ -725,6 +725,7 @@ mod parse_type {
                 }
             ))
         );
+        assert_eq!(parse_type("un (lin bool -> )"), Err(")".into()),)
     }
 }
 
