@@ -1,13 +1,12 @@
 extern crate parser_combinator;
-
-use std::{env, error::Error, fs};
+use std::{env, fs};
 
 mod helper;
 mod lang;
 mod parser;
 mod typing;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), helper::DynError> {
     // コマンドライン引数の検査
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -32,8 +31,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Err(e) => {
             // TODO: エラーの位置を表示する
-            let msg = format!("パースエラー:\n {e}");
-            eprintln!("{msg}");
+            let msg = format!("{e}");
+            eprintln!("パースエラー:\n{msg}");
             return Err(msg.into());
         }
     }
