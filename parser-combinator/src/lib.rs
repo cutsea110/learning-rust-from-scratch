@@ -146,6 +146,17 @@ mod keyword {
         assert_eq!(Err("foo"), keyword("let").parse("foo"));
     }
 }
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let parser = keyword("foo");
+        assert_eq!(Ok(("bar", "foo")), parser.parse("foobar"));
+        assert_eq!(Err("bar"), parser.parse("bar"));
+    }
+}
 
 pub fn literal<'a>(expected: &'static str) -> impl Parser<'a, ()> {
     move |input: &'a str| match input.get(0..expected.len()) {
