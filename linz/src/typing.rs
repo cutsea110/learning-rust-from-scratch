@@ -285,7 +285,7 @@ fn typing_split<'a>(expr: &lang::SplitExpr, env: &mut TypeEnv, depth: usize) -> 
 }
 
 /// 変数の型付け
-fn typing_var<'a>(expr: &str, env: &mut TypeEnv, depth: usize) -> TResult<'a> {
+fn typing_var<'a>(expr: &str, env: &mut TypeEnv, _depth: usize) -> TResult<'a> {
     let ret = env.get_mut(expr);
     if let Some(it) = ret {
         // 定義されている

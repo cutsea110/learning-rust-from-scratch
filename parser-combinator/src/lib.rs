@@ -180,6 +180,7 @@ mod literal {
     }
 }
 
+#[allow(dead_code)]
 fn identifier(input: &str) -> ParseResult<String> {
     let mut matched = String::new();
     let mut chars = input.chars();
@@ -733,6 +734,7 @@ mod altl {
     }
 }
 
+#[allow(dead_code)]
 fn ret<'a, A>(v: A) -> impl Parser<'a, A>
 where
     A: Clone + 'a,
