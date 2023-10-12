@@ -300,6 +300,110 @@ fn typing_qval<'a>(expr: &lang::QValExpr, env: &mut TypeEnv, depth: usize) -> TR
         prim: p,
     })
 }
+#[cfg(test)]
+mod typing_qval {
+    use super::*;
+
+    #[test]
+    fn valid_bool_test() {
+        let mut env = TypeEnv::new();
+
+        // lin true
+        let expr = lang::QValExpr {
+            qual: lang::Qual::Lin,
+            val: lang::ValExpr::Bool(true),
+        };
+
+        let result = typing_qval(&expr, &mut env, 0);
+
+        assert_eq!(
+            result,
+            Ok(lang::TypeExpr {
+                qual: lang::Qual::Lin,
+                prim: lang::PrimType::Bool
+            })
+        );
+    }
+
+    #[test]
+    fn valid_pair_test() {
+        let mut env = TypeEnv::new();
+
+        // lin (lin true, lin false)
+        let expr = lang::QValExpr {
+            qual: lang::Qual::Lin,
+            val: lang::ValExpr::Pair(
+                Box::new(lang::Expr::QVal(lang::QValExpr {
+                    qual: lang::Qual::Lin,
+                    val: lang::ValExpr::Bool(true),
+                })),
+                Box::new(lang::Expr::QVal(lang::QValExpr {
+                    qual: lang::Qual::Lin,
+                    val: lang::ValExpr::Bool(false),
+                })),
+            ),
+        };
+
+        let result = typing_qval(&expr, &mut env, 0);
+
+        assert_eq!(
+            result,
+            Ok(lang::TypeExpr {
+                qual: lang::Qual::Lin,
+                prim: lang::PrimType::Pair(
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Lin,
+                        prim: lang::PrimType::Bool
+                    }),
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Lin,
+                        prim: lang::PrimType::Bool
+                    })
+                )
+            })
+        );
+    }
+
+    #[test]
+    fn valid_fun_test() {
+        let mut env = TypeEnv::new();
+
+        // lin fn x : un bool { lin true }
+        let expr = lang::QValExpr {
+            qual: lang::Qual::Lin,
+            val: lang::ValExpr::Fun(lang::FnExpr {
+                var: "x".to_string(),
+                ty: lang::TypeExpr {
+                    qual: lang::Qual::Un,
+                    prim: lang::PrimType::Bool,
+                },
+                expr: Box::new(lang::Expr::QVal(lang::QValExpr {
+                    qual: lang::Qual::Lin,
+                    val: lang::ValExpr::Bool(true),
+                })),
+            }),
+        };
+
+        let result = typing_qval(&expr, &mut env, 0);
+
+        assert_eq!(
+            result,
+            Ok(lang::TypeExpr {
+                qual: lang::Qual::Lin,
+                prim: lang::PrimType::Arrow(
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Un,
+                        prim: lang::PrimType::Bool
+                    }),
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Lin,
+                        prim: lang::PrimType::Bool
+                    })
+                )
+            })
+        );
+    }
+}
 
 /// free 式の型付け
 fn typing_free<'a>(expr: &lang::FreeExpr, env: &mut TypeEnv, depth: usize) -> TResult<'a> {
