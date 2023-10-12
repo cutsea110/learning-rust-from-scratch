@@ -186,6 +186,48 @@ mod typing_app {
             })
         );
     }
+
+    #[test]
+    fn invalid_test() {
+        let mut env = TypeEnv::new();
+        let expr = lang::AppExpr {
+            expr1: Box::new(lang::Expr::Var("f".to_string())),
+            expr2: Box::new(lang::Expr::Var("x".to_string())),
+        };
+
+        // new stack
+        env.push(0);
+
+        // f: lin (un bool -> lin bool)
+        env.insert(
+            "f".to_string(),
+            lang::TypeExpr {
+                qual: lang::Qual::Lin,
+                prim: lang::PrimType::Arrow(
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Un,
+                        prim: lang::PrimType::Bool,
+                    }),
+                    Box::new(lang::TypeExpr {
+                        qual: lang::Qual::Lin,
+                        prim: lang::PrimType::Bool,
+                    }),
+                ),
+            },
+        );
+
+        // x: lin int
+        env.insert(
+            "x".to_string(),
+            lang::TypeExpr {
+                qual: lang::Qual::Lin,
+                prim: lang::PrimType::Bool,
+            },
+        );
+
+        let result = typing_app(&expr, &mut env, 0);
+        assert_eq!(result, Err("関数適用時における引数の型が異なる".into()));
+    }
 }
 
 /// 修飾子付き値の型付け
