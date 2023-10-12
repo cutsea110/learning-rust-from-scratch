@@ -140,7 +140,7 @@ mod typing_app {
     use super::*;
 
     #[test]
-    fn test() {
+    fn valid_test() {
         let mut env = TypeEnv::new();
         let expr = lang::AppExpr {
             expr1: Box::new(lang::Expr::Var("f".to_string())),
@@ -150,13 +150,14 @@ mod typing_app {
         // new stack
         env.push(0);
 
-        // f: lin (lin bool -> lin bool)
+        // f: lin (un bool -> lin bool)
         env.insert(
             "f".to_string(),
             lang::TypeExpr {
+                qual: lang::Qual::Lin,
                 prim: lang::PrimType::Arrow(
                     Box::new(lang::TypeExpr {
-                        qual: lang::Qual::Lin,
+                        qual: lang::Qual::Un,
                         prim: lang::PrimType::Bool,
                     }),
                     Box::new(lang::TypeExpr {
@@ -164,15 +165,14 @@ mod typing_app {
                         prim: lang::PrimType::Bool,
                     }),
                 ),
-                qual: lang::Qual::Lin,
             },
         );
 
-        // x: lin int
+        // x: un int
         env.insert(
             "x".to_string(),
             lang::TypeExpr {
-                qual: lang::Qual::Lin,
+                qual: lang::Qual::Un,
                 prim: lang::PrimType::Bool,
             },
         );
@@ -181,8 +181,8 @@ mod typing_app {
         assert_eq!(
             result,
             Ok(lang::TypeExpr {
-                prim: lang::PrimType::Bool,
                 qual: lang::Qual::Lin,
+                prim: lang::PrimType::Bool,
             })
         );
     }
