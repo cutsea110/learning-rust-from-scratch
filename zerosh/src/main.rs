@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate log;
 extern crate parser_combinator;
 

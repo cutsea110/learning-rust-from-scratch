@@ -246,7 +246,7 @@ impl Worker {
     fn built_in_cmd(
         &mut self,
         cmd: &model::BuiltInCmd,
-        is_bg: bool,
+        _is_bg: bool,
         shell_tx: &SyncSender<ShellMsg>,
     ) {
         match cmd {
@@ -510,7 +510,7 @@ impl Worker {
                     self.process_term(pid, shell_tx);
                 }
                 // プロセスが停止
-                Ok(WaitStatus::Stopped(pid, sig)) => self.process_stop(pid, shell_tx),
+                Ok(WaitStatus::Stopped(pid, _sig)) => self.process_stop(pid, shell_tx),
                 Ok(WaitStatus::Continued(pid)) => self.process_continue(pid),
                 Ok(WaitStatus::StillAlive) => return, // wait すべき子プロセスはいない
                 Err(nix::Error::ECHILD) => return,    // 子プロセスはいない
