@@ -1,5 +1,6 @@
 # learning-rust-from-scratch
 ref.) https://www.amazon.co.jp/gp/product/4065301955/
+ref.) https://bodil.lol/parser-combinators/ for implementing parser combinator by myself
 
 ## zerosh
 
