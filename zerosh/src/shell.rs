@@ -13,7 +13,7 @@ use nix::{
         ForkResult, Pid,
     },
 };
-use rustyline::{error::ReadlineError, Editor};
+use rustyline::{error::ReadlineError, DefaultEditor};
 use signal_hook::{consts::*, iterator::Signals};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -68,7 +68,7 @@ impl Shell {
         // SIGTTOU を無視に設定しないと、 SIGTSTP が配送されてシェルが停止してしまう
         unsafe { signal(Signal::SIGTTOU, SigHandler::SigIgn).unwrap() };
 
-        let mut rl = Editor::<()>::new()?;
+        let mut rl = DefaultEditor::new()?;
         if let Err(e) = rl.load_history(&self.logfile) {
             eprintln!("{NAME}: failed to load history: {e}");
         }
@@ -90,7 +90,7 @@ impl Shell {
                     if line_trimed.is_empty() {
                         continue; // 空行の場合は再読み込み
                     } else {
-                        rl.add_history_entry(line_trimed); // ヒストリファイルに追加
+                        rl.add_history_entry(line_trimed)?; // ヒストリファイルに追加
                     }
 
                     // worker スレッドに送信
