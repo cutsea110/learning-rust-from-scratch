@@ -3,7 +3,7 @@ mod helper;
 
 use dbg::{State, ZDbg};
 use helper::DynError;
-use rustyline::{error::ReadlineError, Editor};
+use rustyline::{error::ReadlineError, DefaultEditor};
 use std::env;
 
 fn main() -> Result<(), DynError> {
@@ -19,7 +19,7 @@ fn main() -> Result<(), DynError> {
 fn run_dbg(filename: &str) -> Result<(), DynError> {
     let debugger = ZDbg::new(filename.to_string());
     let mut state = State::NotRunning(debugger);
-    let mut rl = Editor::<()>::new()?;
+    let mut rl = DefaultEditor::new()?;
 
     loop {
         match rl.readline("zdbg > ") {
@@ -34,7 +34,7 @@ fn run_dbg(filename: &str) -> Result<(), DynError> {
                 if let State::Exit = state {
                     break;
                 }
-                rl.add_history_entry(line);
+                rl.add_history_entry(line)?;
             }
             Err(ReadlineError::Interrupted) => eprintln!("<<終了は Ctrl-D>>"),
             _ => {
