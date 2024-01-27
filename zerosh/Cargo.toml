@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 dirs = "5.0.1"
-env_logger = "0.10.1"
+env_logger = "0.10.2"
 log = "0.4.20"
 nix = "0.27"
 rustyline = "13.0"
