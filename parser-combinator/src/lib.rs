@@ -144,17 +144,8 @@ mod keyword {
         assert_eq!(Ok(("", "let")), keyword("let").parse("let"));
         assert_eq!(Ok(("", ">&")), keyword(">&").parse(">&"));
         assert_eq!(Err("foo"), keyword("let").parse("foo"));
-    }
-}
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test() {
-        let parser = keyword("foo");
-        assert_eq!(Ok(("bar", "foo")), parser.parse("foobar"));
-        assert_eq!(Err("bar"), parser.parse("bar"));
+        assert_eq!(Ok(("bar", "foo")), keyword("foo").parse("foobar"));
+        assert_eq!(Err("bar"), keyword("foo").parse("bar"));
     }
 }
 
