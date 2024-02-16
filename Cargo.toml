@@ -1,5 +1,6 @@
 [workspace]
 members = ["ackerman", "dbg_target", "fork-test", "linz", "parser-combinator", "regex", "zerodbg", "zerosh"]
+resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
@@ -7,3 +8,9 @@ authors = ["Katsutoshi Itoh"]
 description = "Learning rust from zero"
 documentation = "https://www.amazon.co.jp/dp/4065301955"
 edition = "2021"
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
