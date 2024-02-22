@@ -1,4 +1,4 @@
-extern crate parser_combinator;
+pub use parser_combinator;
 use std::{env, fs};
 
 mod helper;
