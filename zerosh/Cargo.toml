@@ -11,7 +11,7 @@ edition.workspace = true
 [dependencies]
 dirs = "5.0.1"
 env_logger = "0.11.2"
-log = "0.4.20"
+log = "0.4.21"
 nix = "0.27"
 rustyline = "13.0"
 signal-hook = "0.3.17"
