@@ -4,7 +4,7 @@ use nix::{
     sys::wait::{waitpid, WaitPidFlag},
     unistd::{close, dup2, execvp, fork, pipe, ForkResult, Pid},
 };
-use std::ffi::CString;
+use std::{ffi::CString, os::fd::AsRawFd};
 
 /// システムコール呼び出しのラッパ。 EINTR ならリトライ。
 fn syscall<F, T>(f: F) -> Result<T, nix::Error>
@@ -36,9 +36,9 @@ fn dopipes(cmds: Vec<&Vec<&str>>) {
             ForkResult::Child => {
                 // 子プロセスならパイプを stdout に dup2 して再帰
                 syscall(|| {
-                    close(p.0).unwrap();
-                    dup2(p.1, 1).unwrap();
-                    close(p.1)
+                    close(p.0.as_raw_fd()).unwrap();
+                    dup2(p.1.as_raw_fd(), 1).unwrap();
+                    close(p.1.as_raw_fd())
                 })
                 .unwrap();
 
@@ -48,9 +48,9 @@ fn dopipes(cmds: Vec<&Vec<&str>>) {
                 // 親プロセスならパイプを stdin に dup2 して
                 // 端のコマンドを execvp
                 syscall(|| {
-                    close(p.1).unwrap();
-                    dup2(p.0, 0).unwrap();
-                    close(p.0)
+                    close(p.1.as_raw_fd()).unwrap();
+                    dup2(p.0.as_raw_fd(), 0).unwrap();
+                    close(p.0.as_raw_fd())
                 })
                 .unwrap();
 
