@@ -12,8 +12,8 @@ edition.workspace = true
 dirs = "5.0.1"
 env_logger = "0.11.3"
 log = "0.4.21"
-nix = "0.27"
-rustyline = "13.0"
+nix = "0.29"
+rustyline = "14.0"
 signal-hook = "0.3.17"
 
 parser-combinator = { path = "../parser-combinator", version = "0.1.0" }

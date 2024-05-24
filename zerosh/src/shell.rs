@@ -3,15 +3,12 @@ use crate::model;
 use crate::model::ExternalCmd;
 use crate::parser;
 use nix::{
-    libc,
+    libc::{self, tcgetpgrp, tcsetpgrp},
     sys::{
         signal::{killpg, signal, SigHandler, Signal},
         wait::{waitpid, WaitPidFlag, WaitStatus},
     },
-    unistd::{
-        close, dup2, execvp, fork, getpgid, getpid, pipe, setpgid, tcgetpgrp, tcsetpgrp,
-        ForkResult, Pid,
-    },
+    unistd::{close, dup2, execvp, fork, getpgid, getpid, pipe, setpgid, ForkResult, Pid},
 };
 use rustyline::{error::ReadlineError, DefaultEditor};
 use signal_hook::{consts::*, iterator::Signals};
@@ -19,6 +16,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ffi::CString,
     mem::replace,
+    os::fd::AsRawFd,
     path::PathBuf,
     process::exit,
     sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender},
@@ -181,6 +179,7 @@ struct Worker {
 
 impl Worker {
     fn new() -> Self {
+        let pid = unsafe { tcgetpgrp(libc::STDIN_FILENO) };
         Self {
             exit_val: 0,
             fg: None,
@@ -192,7 +191,7 @@ impl Worker {
             // つまりシェルのプロセスグループIDを取得する
             // getpgid でも可能だが、シェルがフォアグラウンドであるかも検査できるので tcgetpgrp を利用している
             // したがって zerosh は制御端末を利用した実行のみをサポートすることになる
-            shell_pgid: tcgetpgrp(libc::STDIN_FILENO).unwrap(),
+            shell_pgid: Pid::from_raw(pid),
         }
     }
 
@@ -298,7 +297,7 @@ impl Worker {
 
             // フォアグラウンドプロセスに設定
             self.fg = Some(*pgid);
-            tcsetpgrp(libc::STDIN_FILENO, *pgid).unwrap();
+            unsafe { tcsetpgrp(libc::STDIN_FILENO, (*pgid).as_raw()) };
 
             // ジョブの実行を再開
             killpg(*pgid, Signal::SIGCONT).unwrap();
@@ -370,7 +369,7 @@ impl Worker {
         } else {
             // 子プロセスをフォアグラウンドプロセスグループにする
             self.fg = Some(pgid);
-            tcsetpgrp(libc::STDIN_FILENO, pgid).unwrap();
+            unsafe { tcsetpgrp(libc::STDIN_FILENO, pgid.as_raw()) };
         }
 
         true
@@ -468,7 +467,7 @@ impl Worker {
     /// シェルをフォアグラウンドに設定
     fn set_shell_fg(&mut self, shell_tx: &SyncSender<ShellMsg>) {
         self.fg = None;
-        tcsetpgrp(libc::STDIN_FILENO, self.shell_pgid).unwrap();
+        unsafe { tcsetpgrp(libc::STDIN_FILENO, self.shell_pgid.as_raw()) };
         shell_tx.send(ShellMsg::Continue(self.exit_val)).unwrap();
     }
 
@@ -636,9 +635,9 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
                 ForkResult::Child => {
                     // 子プロセスならパイプを stdout に dup2 して再帰
                     syscall(|| {
-                        close(p.0).unwrap();
-                        dup2(p.1, libc::STDOUT_FILENO).unwrap();
-                        close(p.1)
+                        close(p.0.as_raw_fd()).unwrap();
+                        dup2(p.1.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
+                        close(p.1.as_raw_fd())
                     })
                     .unwrap();
 
@@ -650,9 +649,9 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
 
                     // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
                     syscall(|| {
-                        close(p.1).unwrap();
-                        dup2(p.0, libc::STDIN_FILENO).unwrap();
-                        close(p.0)
+                        close(p.1.as_raw_fd()).unwrap();
+                        dup2(p.0.as_raw_fd(), libc::STDIN_FILENO).unwrap();
+                        close(p.0.as_raw_fd())
                     })
                     .unwrap();
 
@@ -681,10 +680,10 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
                 ForkResult::Child => {
                     // 子プロセスならパイプを stdout と stderr に dup2 して再帰
                     syscall(|| {
-                        close(p.0).unwrap();
-                        dup2(p.1, libc::STDOUT_FILENO).unwrap();
-                        dup2(p.1, libc::STDERR_FILENO).unwrap();
-                        close(p.1)
+                        close(p.0.as_raw_fd()).unwrap();
+                        dup2(p.1.as_raw_fd(), libc::STDOUT_FILENO).unwrap();
+                        dup2(p.1.as_raw_fd(), libc::STDERR_FILENO).unwrap();
+                        close(p.1.as_raw_fd())
                     })
                     .unwrap();
 
@@ -696,9 +695,9 @@ fn do_pipeline(cmds: &mut model::Pipeline, pids: &mut HashMap<Pid, ProcInfo>) {
 
                     // 親プロセスならパイプを stdin に dup2 して最後のコマンドを execvp
                     syscall(|| {
-                        close(p.1).unwrap();
-                        dup2(p.0, libc::STDIN_FILENO).unwrap();
-                        close(p.0)
+                        close(p.1.as_raw_fd()).unwrap();
+                        dup2(p.0.as_raw_fd(), libc::STDIN_FILENO).unwrap();
+                        close(p.0.as_raw_fd())
                     })
                     .unwrap();
 
