@@ -180,13 +180,13 @@ impl ZDbg<Running> {
         if Some((regs.rip) as *mut c_void) == self.info.brk_addr {
             // 次の実行先がブレークポイントのアドレスの場合、
             // 先に、 0xcc(int 3) に書き換えたメモリを元に戻してから実行する必要がある
-            unsafe {
-                ptrace::write(
-                    self.info.pid,
-                    self.info.brk_addr.unwrap(),
-                    self.info.brk_val as *mut c_void,
-                )?
-            };
+
+            ptrace::write(
+                self.info.pid,
+                self.info.brk_addr.unwrap(),
+                self.info.brk_val,
+            )?;
+
             self.step_and_break()
         } else {
             ptrace::step(self.info.pid, None)?;
@@ -255,7 +255,7 @@ impl ZDbg<Running> {
 
         // "int 3" をメモリに書き込み
         // as *mut c_void と型変換しているのは、C の ptrace が引数にポインタをとるため
-        match unsafe { ptrace::write(self.info.pid, addr, val_int3 as *mut c_void) } {
+        match ptrace::write(self.info.pid, addr, val_int3) {
             Ok(_) => {
                 self.info.brk_addr = Some(addr);
                 self.info.brk_val = val; // 元の値を保持
@@ -301,13 +301,11 @@ impl ZDbg<Running> {
                 let mut regs = ptrace::getregs(self.info.pid)?;
                 if Some((regs.rip - 1) as *mut c_void) == self.info.brk_addr {
                     // 書き換えたメモリを元の値に戻す
-                    unsafe {
-                        ptrace::write(
-                            self.info.pid,
-                            self.info.brk_addr.unwrap(),
-                            self.info.brk_val as *mut c_void,
-                        )?
-                    };
+                    ptrace::write(
+                        self.info.pid,
+                        self.info.brk_addr.unwrap(),
+                        self.info.brk_val,
+                    )?;
 
                     // ブレークポイントで停止したアドレスから 1 つ戻す
                     regs.rip -= 1;
