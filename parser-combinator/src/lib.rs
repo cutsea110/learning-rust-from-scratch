@@ -103,7 +103,7 @@ pub trait Parser<'a, Output> {
 }
 impl<'a, F, Output> Parser<'a, Output> for F
 where
-    F: Fn(&'a str) -> ParseResult<Output>, // ParseResult<'a, Output> ??
+    F: Fn(&'a str) -> ParseResult<'a, Output>, // ParseResult<'a, Output> ??
 {
     fn parse(&self, input: &'a str) -> ParseResult<'a, Output> {
         self(input)
@@ -129,7 +129,7 @@ impl<'a, Output> Parser<'a, Output> for BoxedParser<'a, Output> {
     }
 }
 
-pub fn keyword<'a>(expected: &'static str) -> impl Parser<'a, &str> {
+pub fn keyword<'a>(expected: &'static str) -> impl Parser<'a, &'static str> {
     move |input: &'a str| match input.get(0..expected.len()) {
         Some(next) if next == expected => Ok((&input[expected.len()..], expected)),
         _ => Err(input),
