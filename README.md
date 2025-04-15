@@ -2,8 +2,9 @@
 
 [![Rust](https://github.com/cutsea110/learning-rust-from-scratch/actions/workflows/rust.yml/badge.svg)](https://github.com/cutsea110/learning-rust-from-scratch/actions/workflows/rust.yml)
 
-ref.) https://www.amazon.co.jp/gp/product/4065301955/
-ref.) https://bodil.lol/parser-combinators/ for implementing parser combinator by myself
+refs.)
+- [Textbook](https://www.amazon.co.jp/gp/product/4065301955/)
+- [for implementing parser combinator by myself](https://bodil.lol/parser-combinators/)
 
 ## zerosh
 
