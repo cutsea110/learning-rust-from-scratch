@@ -28,7 +28,7 @@
 use crate::lang::*;
 use parser_combinator::*;
 
-pub fn parse_expr(i: &str) -> ParseResult<Expr> {
+pub fn parse_expr(i: &str) -> ParseResult<'_, Expr> {
     let (i, _) = space0().parse(i)?;
     let (next_i, tok) = first_token(i)?;
 
@@ -152,7 +152,7 @@ mod parse_expr {
     }
 }
 
-fn parse_var(input: &str) -> ParseResult<&str> {
+fn parse_var(input: &str) -> ParseResult<'_, &str> {
     let mut pos = 0;
     let mut chars = input.chars();
 
@@ -188,7 +188,7 @@ mod parse_var {
     }
 }
 
-fn first_token(i: &str) -> ParseResult<&str> {
+fn first_token(i: &str) -> ParseResult<'_, &str> {
     match keyword("let")
         .or_else(keyword("if"))
         .or_else(keyword("split"))
@@ -229,7 +229,7 @@ mod first_token {
     }
 }
 
-fn parse_let(i: &str) -> ParseResult<Expr> {
+fn parse_let(i: &str) -> ParseResult<'_, Expr> {
     let (i, _) = keyword("let").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
@@ -285,7 +285,7 @@ mod parse_let {
     }
 }
 
-fn parse_if(i: &str) -> ParseResult<Expr> {
+fn parse_if(i: &str) -> ParseResult<'_, Expr> {
     let (i, _) = keyword("if").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
@@ -329,7 +329,7 @@ mod parse_if {
     }
 }
 
-fn parse_split(i: &str) -> ParseResult<Expr> {
+fn parse_split(i: &str) -> ParseResult<'_, Expr> {
     let (i, _) = keyword("split").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
@@ -381,7 +381,7 @@ mod parse_split {
     }
 }
 
-fn parse_free(i: &str) -> ParseResult<Expr> {
+fn parse_free(i: &str) -> ParseResult<'_, Expr> {
     let (i, _) = keyword("free").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
@@ -417,7 +417,7 @@ mod parse_free {
     }
 }
 
-fn parse_qval(i: &str) -> ParseResult<Expr> {
+fn parse_qval(i: &str) -> ParseResult<'_, Expr> {
     let (i, q) = parse_qual(i)?;
     let (i, _) = space1().parse(i)?;
 
@@ -451,7 +451,7 @@ mod parse_qval {
     }
 }
 
-fn parse_val(i: &str) -> ParseResult<ValExpr> {
+fn parse_val(i: &str) -> ParseResult<'_, ValExpr> {
     let (next_i, tok) = keyword("fn")
         .or_else(keyword("true"))
         .or_else(keyword("false"))
@@ -501,7 +501,7 @@ mod parse_val {
     }
 }
 
-fn parse_fn(i: &str) -> ParseResult<ValExpr> {
+fn parse_fn(i: &str) -> ParseResult<'_, ValExpr> {
     let (i, _) = keyword("fn").parse(i)?;
     let (i, _) = space1().parse(i)?;
 
@@ -548,7 +548,7 @@ mod parse_fn {
     }
 }
 
-fn parse_pair(i: &str) -> ParseResult<ValExpr> {
+fn parse_pair(i: &str) -> ParseResult<'_, ValExpr> {
     let (i, _) = char('<').parse(i)?;
     let (i, _) = space0().parse(i)?;
 
@@ -584,7 +584,7 @@ mod parse_pair {
     }
 }
 
-fn parse_app(i: &str) -> ParseResult<Expr> {
+fn parse_app(i: &str) -> ParseResult<'_, Expr> {
     let (i, _) = char('(').parse(i)?;
     let (i, _) = space0().parse(i)?;
     let (i, e1) = parse_expr(i)?;
@@ -623,7 +623,7 @@ mod parse_app {
     }
 }
 
-fn parse_type(i: &str) -> ParseResult<TypeExpr> {
+fn parse_type(i: &str) -> ParseResult<'_, TypeExpr> {
     let (i, qual) = parse_qual(i)?;
     let (i, _) = space1().parse(i)?;
     let (i, val) = keyword("bool").or_else(keyword("(")).parse(i)?;
@@ -729,7 +729,7 @@ mod parse_type {
     }
 }
 
-fn parse_qual(i: &str) -> ParseResult<Qual> {
+fn parse_qual(i: &str) -> ParseResult<'_, Qual> {
     let (i, q) = keyword("lin").or_else(keyword("un")).parse(i)?;
     match q {
         "lin" => Ok((i, Qual::Lin)),

@@ -759,7 +759,7 @@ fn fork_exec(
 type CmdResult<'a> = Result<Vec<model::Job>, DynError>;
 
 /// コマンドをパース
-fn parse_cmd(line: &str) -> CmdResult {
+fn parse_cmd(line: &str) -> CmdResult<'_> {
     match parser::parse(line) {
         Ok((_, jobs)) => Ok(jobs),
         Err(e) => Err(e.into()),

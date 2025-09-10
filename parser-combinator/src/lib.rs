@@ -172,7 +172,7 @@ mod literal {
 }
 
 #[allow(dead_code)]
-fn identifier(input: &str) -> ParseResult<String> {
+fn identifier(input: &str) -> ParseResult<'_, String> {
     let mut matched = String::new();
     let mut chars = input.chars();
 
@@ -287,7 +287,7 @@ mod map {
     }
 }
 
-pub fn int32<'a>(i: &str) -> ParseResult<i32> {
+pub fn int32<'a>(i: &str) -> ParseResult<'_, i32> {
     let (i, sign) = opt(char('-')).parse(i)?;
     let (i, digits) = one_or_more(pred(any_char, |c| c.is_digit(10))).parse(i)?;
     let num = digits
@@ -443,7 +443,7 @@ mod zero_or_more {
     }
 }
 
-pub fn any_char(input: &str) -> ParseResult<char> {
+pub fn any_char(input: &str) -> ParseResult<'_, char> {
     match input.chars().next() {
         Some(next) => Ok((&input[next.len_utf8()..], next)),
         _ => Err(input),
