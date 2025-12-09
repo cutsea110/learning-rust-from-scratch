@@ -10,10 +10,10 @@ edition.workspace = true
 
 [dependencies]
 dirs = "5.0.1"
-env_logger = "0.11.3"
-log = "0.4.22"
+env_logger = "0.11.8"
+log = "0.4.29"
 nix = "0.29"
 rustyline = "14.0"
-signal-hook = "0.3.17"
+signal-hook = "0.3.18"
 
 parser-combinator = { path = "../parser-combinator", version = "0.1.0" }
