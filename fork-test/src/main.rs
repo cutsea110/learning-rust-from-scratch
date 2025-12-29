@@ -27,7 +27,11 @@ fn dopipes(cmds: Vec<&Vec<&str>>) {
             .iter()
             .map(|s| CString::new(*s).unwrap())
             .collect::<Vec<_>>();
-        execvp(&filename, &args).unwrap();
+
+        match execvp(&filename, &args) {
+            Err(e) => panic!("execvp failed: {e}"),
+            Ok(x) => match x {}, // x: Infallible
+        } // 子プロセス：成功したら戻らない
     } else {
         // 端以外ならパイプを作って再帰的に実行
         let p = pipe().unwrap();
@@ -60,7 +64,11 @@ fn dopipes(cmds: Vec<&Vec<&str>>) {
                     .iter()
                     .map(|s| CString::new(*s).unwrap())
                     .collect::<Vec<_>>();
-                execvp(&filename, &args).unwrap();
+
+                match execvp(&filename, &args) {
+                    Err(e) => panic!("execvp failed: {e}"),
+                    Ok(x) => match x {},
+                }
             }
         }
     }

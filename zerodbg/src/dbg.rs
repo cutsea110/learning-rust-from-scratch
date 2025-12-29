@@ -123,8 +123,11 @@ impl ZDbg<NotRunning> {
                 ptrace::traceme().unwrap();
 
                 // 子プロセスを実行
-                execvp(&CString::new(self.info.filename.as_str()).unwrap(), &args).unwrap();
-                unreachable!();
+                let filename = CString::new(self.info.filename.as_str())?;
+                match execvp(&filename, &args) {
+                    Err(e) => return Err(e.into()), // exec 失敗時は子でもエラーとして戻す（実際は親に伝える設計も可）
+                    Ok(x) => match x {}, // x: Infallible なので分岐は書けない（= 到達不能）
+                }
             }
             ForkResult::Parent { child } => match waitpid(child, None)? {
                 // 子プロセスで traceme しているので子プロセスは停止もしくは終了するはず
